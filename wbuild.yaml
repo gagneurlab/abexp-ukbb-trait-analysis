@@ -1,0 +1,6 @@
+---
+projectTitle: UKBB_Splicing_Analysis
+htmlOutputPath: /s/public_webshare/project/UKBB_Splicing_Analysis/html
+dataDir: /s/project/bayesRare/UKBB_Splicing_Analysis
+scriptsPath: scripts
+fileRegex: .*

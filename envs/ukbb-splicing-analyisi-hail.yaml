@@ -1,0 +1,12 @@
+name: ukbb-splicing-analyisi-hail
+
+channels:
+  - anaconda
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  - python>=3.7
+  - hail
+  - pandas
