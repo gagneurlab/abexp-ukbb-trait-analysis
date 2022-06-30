@@ -2,3 +2,10 @@
 .Rhistory
 .RData
 .Ruserdata
+.snakemake
+.wBuild
+
+logs/**
+.ipynb_checkpoints
+**.ipynb
+

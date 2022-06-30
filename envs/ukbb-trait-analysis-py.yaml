@@ -1,0 +1,15 @@
+name: ukbb-splicing-analysis-R
+
+channels:
+- conda-forge
+- bioconda
+
+dependencies:
+- pyspark=3.2
+- pandas
+- numpy
+- scipy
+- tqdm
+- plotnine
+- seaborn
+- statsmodels

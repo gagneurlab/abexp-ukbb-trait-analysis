@@ -1,10 +1,8 @@
-name: ukbb-splicing-analyisi-hail
+name: ukbb-splicing-analysis-hail
 
 channels:
-  - anaconda
   - conda-forge
   - bioconda
-  - defaults
 
 dependencies:
   - python>=3.7

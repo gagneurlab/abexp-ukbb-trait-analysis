@@ -1,0 +1,17 @@
+---
+projectTitle: UKBB_Trait_Analysis
+# htmlOutputPath: /s/public_webshare/project/UKBB_Splicing_Analysis/html
+
+ukbb_raw_phenotypes_dir: "/s/raw/ukbiobank/phenotypes"
+ukbb_processed_phenotypes_dir: "/s/project/uk_biobank/processed/phenotypes"
+
+# input
+genebass_results_mt: "/s/project/rep/processed/genebass/results.mt"
+# output
+genebass_results_pq: "/s/project/rep/processed/genebass/results.parquet"
+genebass_results_filtered_pq: "/s/project/rep/processed/genebass/filtered.parquet"
+genebass_bonferroni_cutoff: 0.01
+
+
+trait_associations: "/s/project/rep/processed/trait_associations/{phenotype_col}"
+

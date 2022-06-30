@@ -1,0 +1,15 @@
+name: ukbb-splicing-analysis-R
+
+channels:
+  - conda-forge
+  - bioconda
+
+dependencies:
+  - r-arrow
+  - r-data.table 
+  - r-tidyr
+  - r-yaml
+  - r-stringr
+  - r-irkernel
+  - r-ggplot2
+  - r-hms
