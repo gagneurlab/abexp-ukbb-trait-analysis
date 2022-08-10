@@ -4,6 +4,7 @@ SNAKEFILE_DIR = os.path.dirname(SNAKEFILE)
 SCRIPT=os.path.basename(SNAKEFILE)[:-4]
 
 include: f"{SNAKEFILE_DIR}/associate.py.smk"
+include: f"{SNAKEFILE_DIR}/genes.py.smk"
 
 # subdirectories
 smkpaths = [

@@ -19,6 +19,7 @@ rule associate:
         genebass_pq=config["genebass_results_filtered_pq"],
         pred_score='/s/project/rep/processed/ukbb_wes_200k/pLoF_counts.parquet',
         plof_counts='/s/project/rep/processed/ukbb_wes_200k/pLoF_counts.parquet',
+        protein_coding_genes_pq=config["protein_coding_genes_pq"],
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
     wildcard_constraints:

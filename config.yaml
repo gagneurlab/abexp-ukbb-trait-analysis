@@ -2,6 +2,12 @@
 projectTitle: UKBB_Trait_Analysis
 # htmlOutputPath: /s/public_webshare/project/UKBB_Splicing_Analysis/html
 
+gtf_file: "/s/genomes/Gencode/Gencode_human/release_34/gencode.v34.annotation.gtf.gz"
+fasta_file: "/s/genomes/Gencode/Gencode_human/release_34/GRCh38.primary_assembly.genome.fa"
+
+protein_coding_genes_csv: "/s/project/rep/processed/trait_associations/protein_coding_genes.hg38.csv"
+protein_coding_genes_pq: "/s/project/rep/processed/trait_associations/protein_coding_genes.hg38.parquet"
+
 ukbb_raw_phenotypes_dir: "/s/raw/ukbiobank/phenotypes"
 ukbb_processed_phenotypes_dir: "/s/project/uk_biobank/processed/phenotypes"
 
