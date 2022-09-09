@@ -19,5 +19,9 @@ genebass_results_filtered_pq: "/s/project/rep/processed/genebass/filtered.parque
 genebass_bonferroni_cutoff: 0.01
 
 
-trait_associations: "/s/project/rep/processed/trait_associations/{phenotype_col}"
+trait_associations: "/s/project/rep/processed/trait_associations/associate/{phenotype_col}"
+feature_sets_dir: "/s/project/rep/processed/trait_associations/feature_sets"
 
+
+abexp_predictions: "/s/project/rep/processed/training_results_v10/ukbb_wes_200k/predict_all/fset=DNA_only_nosplice_tl010/gtex_v8_old_dna/dna_only/DNA_only_nosplice_tl010@train_simplecv.py#lightgbm/data.parquet"
+vep_predictions: "/s/project/rep/processed/training_results_v10/ukbb_wes_200k/feature_sets/aggregate_vep_spark.py@gt=any_tl=CANONICAL/data.parquet"

@@ -1,0 +1,17 @@
+SNAKEFILE = workflow.included_stack[-1]
+SNAKEFILE_DIR = os.path.dirname(SNAKEFILE)
+
+SCRIPT=os.path.basename(SNAKEFILE)[:-4]
+
+include: f"{SNAKEFILE_DIR}/loftee_plof.py.smk"
+include: f"{SNAKEFILE_DIR}/abexp.py.smk"
+
+# subdirectories
+smkpaths = [
+]
+
+for p in smkpaths:
+    eprint("Including '%s'..." % p)
+    include: p
+
+

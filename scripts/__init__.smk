@@ -12,6 +12,8 @@ smkpaths = [
     f"{SNAKEFILE_DIR}/ukbb_phenotypes/__init__.smk",
     # genebass:
     f"{SNAKEFILE_DIR}/genebass/__init__.smk",
+    f"{SNAKEFILE_DIR}/associate/__init__.smk",
+    f"{SNAKEFILE_DIR}/feature_sets/__init__.smk",
 ]
 
 for p in smkpaths:

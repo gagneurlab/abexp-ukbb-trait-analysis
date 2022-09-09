@@ -7,10 +7,7 @@ import yaml
 import json
 import pathlib
 
-# from snakemk_util import recursive_format
-
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+include: 'snakefile_utils.smk'
 
 # import wbuild
 # config['wBuildPath'] =  str(pathlib.Path(wbuild.__file__).parent)
@@ -37,12 +34,10 @@ phenotype_dirs, ukbb_codes = glob_wildcards(UKBB_RAW_PHENOTYPES_DIR + "/{phenoty
 # include: config['wBuildPath'] + "/wBuild.snakefile"
 # include: 'additional_rules/rules/data_preprocessing.smk'
 
-include: 'scripts/__init__.smk'
-
 # associations = pd.read_csv('/s/project/bayesRare/UKBB_Splicing_Analysis/genebass/signif_genes.tsv', sep = '\t')
 
 
-
+include: 'scripts/__init__.smk'
 
 rule all:
     input:
@@ -52,3 +47,6 @@ rule all:
         rules.filter_genebass.output,
 #         rules.Index.output, 
 #         expand('/s/project/bayesRare/UKBB_Splicing_Analysis/results/{phenocode}/boxplot.png', phenocode = set(associations.phenocode))
+
+
+localrules: all
