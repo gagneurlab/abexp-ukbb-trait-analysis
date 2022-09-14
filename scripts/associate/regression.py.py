@@ -229,7 +229,10 @@ broadcast_clumping_variants_df = spark.sparkContext.broadcast(clumping_variants_
 # %% {"tags": []}
 # restricted_model = smf.ols(
 #     restricted_formula,
-#     data = covariates_df,
+#     data = (
+#         covariates_df
+#         .assign(sex_f31_0_0=covariates_df["sex_f31_0_0"].where(np.random.randint(0, 2, size=covariates_df.shape[0], dtype=bool))),
+#     )
 # ).fit()
 # broadcast_restricted_model = spark.sparkContext.broadcast(restricted_model)
 
@@ -343,7 +346,7 @@ def regression(
                 .iloc[:1]
                 .copy()
                 .assign(**{
-                    "n_samples": [data_df.shape[0]],
+                    "n_observations": [int(model.nobs)],
                     "term_pvals": [model.pvalues.to_dict()], 
                     "params": [model.params.to_dict()], 
                     "loglikelihood": [model.llf],
@@ -359,7 +362,7 @@ def regression(
         func=fit,
         schema=t.StructType([
             *[dataframe.schema[k] for k in groupby_columns],
-            t.StructField("n_samples", t.LongType()),
+            t.StructField("n_observations", t.LongType()),
             t.StructField("term_pvals", t.MapType(t.StringType(), t.DoubleType())),
             t.StructField("params", t.MapType(t.StringType(), t.DoubleType())),
             t.StructField("loglikelihood", t.DoubleType()),
