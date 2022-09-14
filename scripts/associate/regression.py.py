@@ -92,7 +92,8 @@ except NameError:
             # "feature_set": "LOFTEE_pLoF",
             # "feature_set": "AbExp_pivot",
             "feature_set": "LOFTEE_pLoF",
-            "covariates": "sex+age+genPC+CLMP",
+            # "covariates": "sex+age+genPC+CLMP",
+            "covariates": "sex+age+genPC",
         }
     )
 
@@ -125,8 +126,13 @@ print(restricted_formula)
 # # Read covariates
 
 # %%
-covariates_df = pd.read_parquet(snakemake.input["covariates_pq"])
+covariates_df = pd.read_parquet(snakemake.input["covariates_pq"]).fillna(0)
 covariates_df
+
+# %%
+display(
+    "Size of 'covariates_df': %.3fGb" % (covariates_df.memory_usage(deep=True).sum() / 1024**3)
+)
 
 # %% [markdown] {"tags": []}
 # ## clumping
@@ -170,6 +176,7 @@ def format_formula(formula, keys, add_clumping=True, clumping_variants_df=clumpi
 test_formula = format_formula(
     formula=restricted_formula,
     clumping_variants_df=clumping_variants_df,
+    add_clumping=True,
     keys={
         "gene": "ENSG00000084674",
     }
@@ -182,6 +189,7 @@ test_formula = format_formula(
 test_formula_2 = format_formula(
     formula=restricted_formula,
     clumping_variants_df=clumping_variants_df,
+    add_clumping=True,
     keys={
         "gene": "",
     }
@@ -288,6 +296,7 @@ def regression(
             formatted_full_formula = format_formula(
                 formula=full_formula,
                 keys=keys,
+                add_clumping=add_clumping,
                 clumping_variants_df=clumping_variants_df,
             )
             
@@ -303,7 +312,7 @@ def regression(
             covariates_df = covariates_df.loc[:, [c for c in covariates_df.columns if c in necessary_columns]]
             
             # merge with phenotype df to make sure that we have all scores predicted
-            data_df = covariates_df.merge(pd_df, on=["individual"], how="left").fillna(0)
+            data_df = covariates_df.merge(pd_df.fillna(0), on=["individual"], how="left")
         
             # restricted_model = broadcast_restricted_model.value
             restricted_model = smf.ols(

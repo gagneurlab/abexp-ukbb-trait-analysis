@@ -279,6 +279,10 @@ variants = (
 variants
 
 # %%
+# cast data to save memory
+mac_index_vars = mac_index_vars.with_columns([pl.col(c).cast(pl.Int8).alias(c) for c in variants["variant"]])
+
+# %% {"tags": []}
 import pyranges as pr
 
 # %%
