@@ -226,9 +226,10 @@ def get_variables_from_formula(formula, lhs=True, rhs=True):
 broadcast_covariates_df = spark.sparkContext.broadcast(covariates_df)
 broadcast_clumping_variants_df = spark.sparkContext.broadcast(clumping_variants_df)
 
+# %% {"tags": []}
 # restricted_model = smf.ols(
 #     restricted_formula,
-#     data = phenotype_df
+#     data = covariates_df,
 # ).fit()
 # broadcast_restricted_model = spark.sparkContext.broadcast(restricted_model)
 
@@ -312,7 +313,11 @@ def regression(
             covariates_df = covariates_df.loc[:, [c for c in covariates_df.columns if c in necessary_columns]]
             
             # merge with phenotype df to make sure that we have all scores predicted
-            data_df = covariates_df.merge(pd_df.fillna(0), on=["individual"], how="left")
+            data_df = covariates_df.merge(pd_df, on=["individual"], how="left")
+            # fill missing values
+            data_df = data_df.fillna({
+                c: 0 for c in pd_df.columns
+            })
         
             # restricted_model = broadcast_restricted_model.value
             restricted_model = smf.ols(
