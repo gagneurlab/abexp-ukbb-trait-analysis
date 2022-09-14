@@ -15,7 +15,6 @@ rule read_phenotypes:
         output_meta_pq=f"{UKBB_PROCESSED_PHENOTYPES_DIR}/{{pheno_dir}}/{{ukbb_code}}.meta.parquet",
     input:
         input_data_dir=f"{UKBB_RAW_PHENOTYPES_DIR}/{{pheno_dir}}/",
-        install_R_packages_done=ancient(INSTALL_R_PACKAGES_DONE),
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
     wildcard_constraints:

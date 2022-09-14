@@ -1,4 +1,4 @@
-name: ukbb-splicing-analysis-hail
+name: ukbb-trait-analysis-hail
 
 channels:
   - conda-forge

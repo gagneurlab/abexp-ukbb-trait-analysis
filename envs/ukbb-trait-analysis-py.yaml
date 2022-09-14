@@ -1,4 +1,4 @@
-name: ukbb-splicing-analysis-R
+name: ukbb-trait-analysis-py
 
 channels:
 - conda-forge
