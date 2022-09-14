@@ -1,0 +1,117 @@
+---
+index_columns:
+  - "individual"
+  - "gene"
+
+
+feature_sets:
+  AbExp: "{config.feature_sets_dir}/abexp_pivot.py"
+
+variables:
+  "AbExp":
+    - "AbExp":
+        - "Adipose%20-%20Subcutaneous"
+        - "Adipose%20-%20Visceral%20%28Omentum%29"
+        - "Adrenal%20Gland"
+        - "Artery%20-%20Aorta"
+        - "Artery%20-%20Coronary"
+        - "Artery%20-%20Tibial"
+        - "Brain%20-%20Amygdala"
+        - "Brain%20-%20Anterior%20cingulate%20cortex%20%28BA24%29"
+        - "Brain%20-%20Caudate%20%28basal%20ganglia%29"
+        - "Brain%20-%20Cerebellar%20Hemisphere"
+        - "Brain%20-%20Cerebellum"
+        - "Brain%20-%20Cortex"
+        - "Brain%20-%20Frontal%20Cortex%20%28BA9%29"
+        - "Brain%20-%20Hippocampus"
+        - "Brain%20-%20Hypothalamus"
+        - "Brain%20-%20Nucleus%20accumbens%20%28basal%20ganglia%29"
+        - "Brain%20-%20Putamen%20%28basal%20ganglia%29"
+        - "Brain%20-%20Spinal%20cord%20%28cervical%20c-1%29"
+        - "Brain%20-%20Substantia%20nigra"
+        - "Breast%20-%20Mammary%20Tissue"
+        - "Cells%20-%20Cultured%20fibroblasts"
+        - "Cells%20-%20EBV-transformed%20lymphocytes"
+        - "Colon%20-%20Sigmoid"
+        - "Colon%20-%20Transverse"
+        - "Esophagus%20-%20Gastroesophageal%20Junction"
+        - "Esophagus%20-%20Mucosa"
+        - "Esophagus%20-%20Muscularis"
+        - "Heart%20-%20Atrial%20Appendage"
+        - "Heart%20-%20Left%20Ventricle"
+        - "Kidney%20-%20Cortex"
+        - "Liver"
+        - "Lung"
+        - "Minor%20Salivary%20Gland"
+        - "Muscle%20-%20Skeletal"
+        - "Nerve%20-%20Tibial"
+        - "Ovary"
+        - "Pancreas"
+        - "Pituitary"
+        - "Prostate"
+        - "Skin%20-%20Not%20Sun%20Exposed%20%28Suprapubic%29"
+        - "Skin%20-%20Sun%20Exposed%20%28Lower%20leg%29"
+        - "Small%20Intestine%20-%20Terminal%20Ileum"
+        - "Spleen"
+        - "Stomach"
+        - "Testis"
+        - "Thyroid"
+        - "Uterus"
+        - "Vagina"
+        - "Whole%20Blood"
+
+fill_values:
+    "feature.AbExp@AbExp.Adipose%20-%20Subcutaneous": 0.0
+    "feature.AbExp@AbExp.Adipose%20-%20Visceral%20%28Omentum%29": 0.0
+    "feature.AbExp@AbExp.Adrenal%20Gland": 0.0
+    "feature.AbExp@AbExp.Artery%20-%20Aorta": 0.0
+    "feature.AbExp@AbExp.Artery%20-%20Coronary": 0.0
+    "feature.AbExp@AbExp.Artery%20-%20Tibial": 0.0
+    "feature.AbExp@AbExp.Brain%20-%20Amygdala": 0.0
+    "feature.AbExp@AbExp.Brain%20-%20Anterior%20cingulate%20cortex%20%28BA24%29": 0.0
+    "feature.AbExp@AbExp.Brain%20-%20Caudate%20%28basal%20ganglia%29": 0.0
+    "feature.AbExp@AbExp.Brain%20-%20Cerebellar%20Hemisphere": 0.0
+    "feature.AbExp@AbExp.Brain%20-%20Cerebellum": 0.0
+    "feature.AbExp@AbExp.Brain%20-%20Cortex": 0.0
+    "feature.AbExp@AbExp.Brain%20-%20Frontal%20Cortex%20%28BA9%29": 0.0
+    "feature.AbExp@AbExp.Brain%20-%20Hippocampus": 0.0
+    "feature.AbExp@AbExp.Brain%20-%20Hypothalamus": 0.0
+    "feature.AbExp@AbExp.Brain%20-%20Nucleus%20accumbens%20%28basal%20ganglia%29": 0.0
+    "feature.AbExp@AbExp.Brain%20-%20Putamen%20%28basal%20ganglia%29": 0.0
+    "feature.AbExp@AbExp.Brain%20-%20Spinal%20cord%20%28cervical%20c-1%29": 0.0
+    "feature.AbExp@AbExp.Brain%20-%20Substantia%20nigra": 0.0
+    "feature.AbExp@AbExp.Breast%20-%20Mammary%20Tissue": 0.0
+    "feature.AbExp@AbExp.Cells%20-%20Cultured%20fibroblasts": 0.0
+    "feature.AbExp@AbExp.Cells%20-%20EBV-transformed%20lymphocytes": 0.0
+    "feature.AbExp@AbExp.Colon%20-%20Sigmoid": 0.0
+    "feature.AbExp@AbExp.Colon%20-%20Transverse": 0.0
+    "feature.AbExp@AbExp.Esophagus%20-%20Gastroesophageal%20Junction": 0.0
+    "feature.AbExp@AbExp.Esophagus%20-%20Mucosa": 0.0
+    "feature.AbExp@AbExp.Esophagus%20-%20Muscularis": 0.0
+    "feature.AbExp@AbExp.Heart%20-%20Atrial%20Appendage": 0.0
+    "feature.AbExp@AbExp.Heart%20-%20Left%20Ventricle": 0.0
+    "feature.AbExp@AbExp.Kidney%20-%20Cortex": 0.0
+    "feature.AbExp@AbExp.Liver": 0.0
+    "feature.AbExp@AbExp.Lung": 0.0
+    "feature.AbExp@AbExp.Minor%20Salivary%20Gland": 0.0
+    "feature.AbExp@AbExp.Muscle%20-%20Skeletal": 0.0
+    "feature.AbExp@AbExp.Nerve%20-%20Tibial": 0.0
+    "feature.AbExp@AbExp.Ovary": 0.0
+    "feature.AbExp@AbExp.Pancreas": 0.0
+    "feature.AbExp@AbExp.Pituitary": 0.0
+    "feature.AbExp@AbExp.Prostate": 0.0
+    "feature.AbExp@AbExp.Skin%20-%20Not%20Sun%20Exposed%20%28Suprapubic%29": 0.0
+    "feature.AbExp@AbExp.Skin%20-%20Sun%20Exposed%20%28Lower%20leg%29": 0.0
+    "feature.AbExp@AbExp.Small%20Intestine%20-%20Terminal%20Ileum": 0.0
+    "feature.AbExp@AbExp.Spleen": 0.0
+    "feature.AbExp@AbExp.Stomach": 0.0
+    "feature.AbExp@AbExp.Testis": 0.0
+    "feature.AbExp@AbExp.Thyroid": 0.0
+    "feature.AbExp@AbExp.Uterus": 0.0
+    "feature.AbExp@AbExp.Vagina": 0.0
+    "feature.AbExp@AbExp.Whole%20Blood": 0.0
+
+
+groupby_columns:
+- "gene"
+# - "subtissue"

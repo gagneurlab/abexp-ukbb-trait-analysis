@@ -32,6 +32,9 @@ CONDA_ENV_YAML_DIR = f"{SNAKEMAKE_DIR}/envs"
 UKBB_RAW_PHENOTYPES_DIR = config["ukbb_raw_phenotypes_dir"]
 UKBB_PROCESSED_PHENOTYPES_DIR = config["ukbb_processed_phenotypes_dir"]
 
+
+
+
 phenotype_dirs, ukbb_codes = glob_wildcards(UKBB_RAW_PHENOTYPES_DIR + "/{phenotype_dir}/{ukbb_code}.tab")
 
         
@@ -43,6 +46,13 @@ phenotype_dirs, ukbb_codes = glob_wildcards(UKBB_RAW_PHENOTYPES_DIR + "/{phenoty
 
 include: 'scripts/__init__.smk'
 
+hdl_cholesterol=expand(
+    rules.associate__compare_genebass.output,
+    phenotype_col="hdl_cholesterol_f30760_0_0", 
+    feature_set=["LOFTEE_pLoF", "AbExp_pivot"],
+    covariates=["sex+age+genPC", "sex+age+genPC+CLMP"],
+)
+
 rule all:
     input:
         expand(rules.read_phenotypes.output, zip, pheno_dir=phenotype_dirs, ukbb_code=ukbb_codes),
@@ -50,6 +60,7 @@ rule all:
         rules.filter_genebass.output,
 #         rules.Index.output, 
 #         expand('/s/project/bayesRare/UKBB_Splicing_Analysis/results/{phenocode}/boxplot.png', phenocode = set(associations.phenocode))
+        *hdl_cholesterol,
 
 
 localrules: all

@@ -55,6 +55,7 @@ except NameError:
         default_wildcards={
             "phenotype_col": "hdl_cholesterol_f30760_0_0",
             "feature_set": "LOFTEE_pLoF",
+            "covariates": "sex+age+genPC+CLMP",
         }
     )
 
@@ -103,57 +104,18 @@ config["snakemake"] = {
 }
 
 # %%
-restricted_formula_template = []
-for c in config["restricted_formula"]:
-    if c == "{{clump}}":
-        raise ValueError("Not yet implemented")
-    elif c == "{{PRS}}":
-        raise ValueError("Not yet implemented")
-    else:
-        restricted_formula_template.append(c)
-restricted_formula = "\n + ".join(restricted_formula_template)
-
-config["restricted_formula"] = restricted_formula
-print(restricted_formula)
+## add covariate config
+with open(snakemake.input["covariate_config"], "r") as fd:
+    covariate_config = yaml.safe_load(fd)
 
 # %%
-import patsy
-
-model_desc = patsy.ModelDesc.from_formula(restricted_formula)
-
-covariate_cols = list(dict.fromkeys(
-    [factor.name() for term in model_desc.rhs_termlist for factor in term.factors]
-))
-covariate_cols
-
-# %%
-config["covariate_cols"] = covariate_cols
-
-# %%
-phenotype_col = snakemake.wildcards["phenotype_col"]
-phenotype_col
-
-# %%
-import re
-
-m = re.search('.*_f(.+?)_.*', phenotype_col)
-if m:
-    phenocode = m.group(1)
-else:
-    raise ValueError("Cannot find phenocode!")
-phenocode
-
-# %%
-config["phenocode"] = phenocode
+config["covariates"] = covariate_config
 
 # %%
 print(json.dumps(config, indent=2, default=str))
 
 # %%
 with open(snakemake.output["config"], "w") as fd:
-    yaml.dump(config, fd)
-
-# %%
-
+    yaml.dump(config, fd, sort_keys=False)
 
 # %%

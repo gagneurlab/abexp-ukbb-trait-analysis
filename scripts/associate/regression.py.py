@@ -89,7 +89,10 @@ except NameError:
         rule_name = 'associate__regression',
         default_wildcards={
             "phenotype_col": "hdl_cholesterol_f30760_0_0",
+            # "feature_set": "LOFTEE_pLoF",
+            # "feature_set": "AbExp_pivot",
             "feature_set": "LOFTEE_pLoF",
+            "covariates": "sex+age+genPC+CLMP",
         }
     )
 
@@ -111,109 +114,151 @@ phenotype_col = snakemake.wildcards["phenotype_col"]
 phenotype_col
 
 # %%
-phenocode = config["phenocode"]
+phenocode = config["covariates"]["phenocode"]
 phenocode
 
 # %%
-restricted_formula = config["restricted_formula"]
+restricted_formula = config["covariates"]["restricted_formula"]
 print(restricted_formula)
 
 # %% [markdown]
-# # Read metadata
+# # Read covariates
 
 # %%
-phenotype_metadata_df = (
-    spark.read.parquet(snakemake.input["phenotype_metadata_pq"])
-    .withColumnRenamed("field.showcase", "phenocode")
-    .toPandas()
+covariates_df = pd.read_parquet(snakemake.input["covariates_pq"])
+covariates_df
+
+# %% [markdown] {"tags": []}
+# ## clumping
+
+# %%
+clumping_variants_df = pd.read_parquet(snakemake.input["clumping_variants_pq"])
+clumping_variants_df
+
+
+# %%
+def get_variants_by_gene(clumping_variants_df, gene_id):
+    included_vars = clumping_variants_df.query(f"gene == '{gene_id}'")["variant"].values
+    return included_vars
+
+
+# %%
+# get_variants_by_gene(clumping_variants_df, gene_id="ENSG00000084674")
+
+# %%
+import re
+
+def format_formula(formula, keys, add_clumping=True, clumping_variants_df=clumping_variants_df):
+    if add_clumping:
+        if not "gene" in keys:
+            raise ValueError(f"missing gene in keys: '{keys}'!")
+
+        gene_id = keys["gene"]
+
+        variants = get_variants_by_gene(clumping_variants_df=clumping_variants_df, gene_id=gene_id)
+
+        if len(variants) > 0:
+            formula = "\n + ".join([
+                formula,
+                *[f"Q('{c}')" for c in variants]
+            ])
+    
+    return formula
+
+
+# %%
+test_formula = format_formula(
+    formula=restricted_formula,
+    clumping_variants_df=clumping_variants_df,
+    keys={
+        "gene": "ENSG00000084674",
+    }
 )
-phenotype_metadata_df
 
 # %%
-phenotype_metadata_subset = phenotype_metadata_df.set_index("col.name").loc[[
-    *config["covariate_cols"],
-#     *phenotype_column,
-    phenotype_col,
-]]
-phenotype_metadata_subset
+# print(test_formula)
 
 # %%
-phenotype_metadata_subset.reset_index().to_parquet(snakemake.output["metadata_pq"], index=False)
+test_formula_2 = format_formula(
+    formula=restricted_formula,
+    clumping_variants_df=clumping_variants_df,
+    keys={
+        "gene": "",
+    }
+)
 
 # %%
-phenotype_metadata_subset.reset_index().to_csv(snakemake.output["metadata_tsv"], index=False, header=True, sep="\t")
-
-# %% [markdown]
-# # Load phenotypes
+# print(test_formula_2)
 
 # %%
-data_dfs = []
-for data_path, group_df in phenotype_metadata_subset.groupby("data_path"):
-    data_df = (
-        spark.read.parquet(data_path)
-        .select(
-            "eid",
-            *group_df.index.to_list()
-        )
-    )
-    data_dfs.append(data_df)
+import patsy
+import re
+
+def get_variables_from_formula(formula, lhs=True, rhs=True):
+    model_desc = patsy.ModelDesc.from_formula(formula)
+
+    covariate_cols = [
+        *([factor.name() for term in model_desc.lhs_termlist for factor in term.factors] if lhs else []),
+        *([factor.name() for term in model_desc.rhs_termlist for factor in term.factors] if rhs else []),
+    ]
+    # deduplicate
+    covariate_cols = list(dict.fromkeys(covariate_cols))
+    
+    # replace Q($i) -> $i
+    regex = re.compile(r"""Q\(['"](.*)['"]\)""")
+    covariate_cols = [regex.sub(r"\1", c) for c in covariate_cols]
+    
+    return covariate_cols
+
 
 # %%
-len(data_dfs)
-
-# %%
-import functools
-data_df = functools.reduce(lambda df1, df2: df1.join(df2, on="eid", how="outer"), data_dfs)
-
-# remove NA values from the phenotype column
-data_df = data_df.filter(f.col(phenotype_col).isNotNull())
-# rename eid col
-data_df = data_df.withColumnRenamed("eid", "individual")
-# make sure that sample_id is a string
-data_df = data_df.withColumn("individual", f.col("individual").cast(t.StringType()))
-
-# broadcast it
-data_df = f.broadcast(data_df.sort("individual"))
-
-data_df.printSchema()
+# get_variables_from_formula(test_formula)
 
 # %% {"tags": []}
-spark._jvm.System.gc()
+broadcast_covariates_df = spark.sparkContext.broadcast(covariates_df)
+broadcast_clumping_variants_df = spark.sparkContext.broadcast(clumping_variants_df)
 
-# %% {"tags": []}
-phenotype_df = data_df.toPandas()
-
-# %%
-phenotype_df
-
-# %% {"tags": []}
-import statsmodels.formula.api as smf
-from threadpoolctl import threadpool_limits
-from typing import List, Union
-
-restricted_model = smf.ols(
-    restricted_formula, 
-    data = phenotype_df
-).fit()
-
-broadcast_phenotype_df = spark.sparkContext.broadcast(phenotype_df)
+# restricted_model = smf.ols(
+#     restricted_formula,
+#     data = phenotype_df
+# ).fit()
 # broadcast_restricted_model = spark.sparkContext.broadcast(restricted_model)
 
 # %% {"tags": []}
+import statsmodels.formula.api as smf
+
+from threadpoolctl import threadpool_limits
+from typing import List, Union
+
 def regression(
     dataframe: pyspark.sql.DataFrame,
-    groupby_columns: List[str], 
-    formula: str,
+    groupby_columns: Union[str, List[str]], 
+    full_formula: str,
     restricted_formula: str,
-    phenotype_df: Union[pyspark.Broadcast, pd.DataFrame]
+    covariates_df: Union[pyspark.Broadcast, pd.DataFrame],
+    clumping_variants_df: Union[pyspark.Broadcast, pd.DataFrame] = None,
+    add_clumping: bool = config["covariates"]["add_clumping"],
 ):
+    if isinstance(groupby_columns, str):
+        groupby_columns = [groupby_columns]
+    
     # make sure to use broadcasted variable
-    if isinstance(phenotype_df, pyspark.Broadcast):
-        broadcast_phenotype_df = phenotype_df
-    elif isinstance(phenotype_df, pd.DataFrame):
-        broadcast_phenotype_df = spark.sparkContext.broadcast(phenotype_df)
+    if isinstance(covariates_df, pyspark.Broadcast):
+        broadcast_covariates_df = covariates_df
+    elif isinstance(covariates_df, pd.DataFrame):
+        broadcast_covariates_df = spark.sparkContext.broadcast(covariates_df)
     else:
-        raise ValueError("'phenotype_df' has to be of type pd.DataFrame or pyspark.Broadcast")
+        raise ValueError("'covariates_df' has to be of type pd.DataFrame or pyspark.Broadcast")
+    
+    if add_clumping:
+        if isinstance(clumping_variants_df, pyspark.Broadcast):
+            broadcast_clumping_variants_df = clumping_variants_df
+        elif isinstance(clumping_variants_df, pd.DataFrame):
+            broadcast_clumping_variants_df = spark.sparkContext.broadcast(clumping_variants_df)
+        else:
+            raise ValueError("'clumping_variants_df' has to be of type pd.DataFrame or pyspark.Broadcast")
+    else:
+        broadcast_clumping_variants_df = None
     
 #     if isinstance(restricted_model, pyspark.Broadcast):
 #         broadcast_restricted_model = restricted_model
@@ -222,14 +267,47 @@ def regression(
     
     def fit(pd_df):
         with threadpool_limits(limits=1):
-            phenotype_df = broadcast_phenotype_df.value
+            keys=pd_df.loc[:, groupby_columns].iloc[0].to_dict()
+            
+            # ## unpack all broadcast variables
+            covariates_df = broadcast_covariates_df.value
+            
+            # unpack only if needed
+            if add_clumping:
+                clumping_variants_df = broadcast_clumping_variants_df.value
+            else:
+                clumping_variants_df = None
+            # ## unpacking done
 
+            formatted_restricted_formula = format_formula(
+                formula=restricted_formula,
+                keys=keys,
+                add_clumping=add_clumping,
+                clumping_variants_df=clumping_variants_df,
+            )
+            formatted_full_formula = format_formula(
+                formula=full_formula,
+                keys=keys,
+                clumping_variants_df=clumping_variants_df,
+            )
+            
+            # get necessary columns
+            restricted_variables = get_variables_from_formula(formatted_restricted_formula)
+            full_variables = get_variables_from_formula(formatted_full_formula)
+            necessary_columns = {
+                *restricted_variables,
+                *full_variables,
+                "individual",
+            }
+            # filter covariates for necessary columns
+            covariates_df = covariates_df.loc[:, [c for c in covariates_df.columns if c in necessary_columns]]
+            
             # merge with phenotype df to make sure that we have all scores predicted
-            data_df = phenotype_df.merge(pd_df, on=["individual"], how="left", ).fillna(0)
+            data_df = covariates_df.merge(pd_df, on=["individual"], how="left").fillna(0)
         
             # restricted_model = broadcast_restricted_model.value
             restricted_model = smf.ols(
-                restricted_formula,
+                formatted_restricted_formula,
                 data = data_df
             ).fit()
             
@@ -239,7 +317,7 @@ def regression(
 #             ).fit()
             
             model = smf.ols(
-                formula,
+                formatted_full_formula,
                 data = data_df
             ).fit()
             
@@ -247,7 +325,8 @@ def regression(
 
             return (
                 pd_df
-                .iloc[:1].loc[:, groupby_columns]
+                .loc[:, groupby_columns]
+                .iloc[:1]
                 .copy()
                 .assign(**{
                     "n_samples": [data_df.shape[0]],
@@ -279,11 +358,12 @@ def regression(
     )
 
 _test = regression(
-    dataframe=data_df.select("individual"), 
-    groupby_columns=[],
-    formula=restricted_formula,
+    dataframe=spark.createDataFrame(covariates_df[["individual"]].assign(gene="ENSG00000084674")), 
+    groupby_columns=["gene"],
+    full_formula=restricted_formula,
     restricted_formula=restricted_formula,
-    phenotype_df=broadcast_phenotype_df
+    covariates_df=broadcast_covariates_df,
+    clumping_variants_df=broadcast_clumping_variants_df,
 ).toPandas()
 
 # %%
@@ -351,7 +431,11 @@ features = []
 for c in features_df.columns:
     if c.startswith("feature."):
         # rename columns because spark is stupid and fails with selecting in a pandas udf
-        new_name = c[8:].replace(".", "_").replace("@", "__")
+        new_name = (
+            c[8:]
+            .replace(".", "_")
+            # .replace("@", "__")
+        )
         renamed_features_df = renamed_features_df.withColumnRenamed(c, new_name)
         
         features.append(new_name)
@@ -381,7 +465,7 @@ features
 # %%
 full_formula = "\n + ".join([
     restricted_formula,
-    *features,
+    *[f"Q('{c}')" for c in features],
 ])
 print(full_formula)
 
@@ -389,9 +473,10 @@ print(full_formula)
 regression_results_sdf = regression(
     renamed_features_df, 
     groupby_columns=groupby_columns, 
-    formula=full_formula,
+    full_formula=full_formula,
     restricted_formula=restricted_formula,
-    phenotype_df=broadcast_phenotype_df,
+    covariates_df=broadcast_covariates_df,
+    clumping_variants_df=broadcast_clumping_variants_df,
 )
 regression_results_sdf.printSchema()
 

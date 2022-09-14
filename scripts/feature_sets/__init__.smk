@@ -5,6 +5,7 @@ SCRIPT=os.path.basename(SNAKEFILE)[:-4]
 
 include: f"{SNAKEFILE_DIR}/loftee_plof.py.smk"
 include: f"{SNAKEFILE_DIR}/abexp.py.smk"
+include: f"{SNAKEFILE_DIR}/abexp_pivot.py.smk"
 
 # subdirectories
 smkpaths = [

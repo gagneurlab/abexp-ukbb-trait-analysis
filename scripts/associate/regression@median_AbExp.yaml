@@ -1,0 +1,20 @@
+---
+index_columns:
+  - "individual"
+  - "gene"
+
+
+feature_sets:
+  AbExp: "{config.feature_sets_dir}/abexp.py@agg=median"
+
+variables:
+  "AbExp":
+    - "median_AbExp"
+
+fill_values:
+  "feature.AbExp@median_AbExp": 0.0
+
+
+groupby_columns:
+- "gene"
+# - "subtissue"
