@@ -9,3 +9,5 @@ logs/**
 .ipynb_checkpoints
 **.ipynb
 
+slurm-status.log
+
