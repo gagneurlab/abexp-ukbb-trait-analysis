@@ -25,7 +25,9 @@ rule covariates:
         covariates_config=TEMPLATE_FILE,
         # clumping
         mac_index_variants=config["mac_index_variants"],
-        genome_annotation=config["gtf_file"],
+        clumping_genome_annotation=config["clumping_gtf_file"],
+        # PRS scores
+        PRS_score_mapping_csv=config["PRS_score_mapping"],
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
         # age_col='age_when_attended_assessment_centre_f21003_0_0',

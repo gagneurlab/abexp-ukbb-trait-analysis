@@ -50,7 +50,7 @@ hdl_cholesterol=expand(
     rules.associate__compare_genebass.output,
     phenotype_col="hdl_cholesterol_f30760_0_0", 
     feature_set=["LOFTEE_pLoF", "AbExp_pivot", "max_AbExp", "median_AbExp"],
-    covariates=["sex+age+genPC", "sex+age+genPC+CLMP"],
+    covariates=["sex+age+genPC", "sex+age+genPC+CLMP", "sex+age+genPC+CLMP+PRS"],
 )
 
 rule all:

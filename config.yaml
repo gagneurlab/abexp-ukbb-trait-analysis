@@ -25,6 +25,7 @@ output_basedir: "/s/project/rep/processed/trait_associations/ukbb_wes_200k"
 trait_associations: "/s/project/rep/processed/trait_associations/ukbb_wes_200k/associate/{phenotype_col}"
 feature_sets_dir: "/s/project/rep/processed/trait_associations/ukbb_wes_200k/feature_sets"
 samples: "/s/project/rep/processed/trait_associations/ukbb_wes_200k/samples.txt"
+PRS_score_mapping: "/s/project/rep/processed/trait_associations/ukbb_wes_200k/PRS_score_mapping.csv"
 
 # feature sets
 abexp_predictions: "/s/project/rep/processed/training_results_v10/ukbb_wes_200k/predict_all/fset=DNA_only_nosplice_tl010/gtex_v8_old_dna/dna_only/DNA_only_nosplice_tl010@train_simplecv.py#lightgbm/data.parquet"
@@ -32,3 +33,4 @@ vep_predictions: "/s/project/rep/processed/training_results_v10/ukbb_wes_200k/fe
 vep_variants: "/s/project/rep/processed/training_results_v10/ukbb_wes_200k/veff/tissue_specific_vep.py@tl=CANONICAL/veff.parquet"
 # clumping
 mac_index_variants: "/s/project/uk_biobank/processed/clumping/30780/WES_200K_index_vars_mac_30780.parquet.p"
+clumping_gtf_file: "/s/genomes/Gencode/Gencode_human/release_34/gencode.v34.annotation.gtf.gz"

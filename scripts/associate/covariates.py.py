@@ -56,7 +56,8 @@ except NameError:
         rule_name = 'covariates',
         default_wildcards={
             "phenotype_col": "hdl_cholesterol_f30760_0_0",
-            "covariates": "sex+age+genPC+CLMP",
+            # "covariates": "sex+age+genPC+CLMP",
+            "covariates": "sex+age+genPC+CLMP+PRS",
         }
     )
 
@@ -116,8 +117,21 @@ config["clumping_gene_padding"]
 config["add_PRS"] = config.get("add_PRS", False)
 config["add_PRS"]
 
+# %% [markdown]
+# ## PRS
+
 # %%
-restricted_formula_template = config["restricted_formula"]
+prs_score_mapping = (
+    pl.read_csv(snakemake.input["PRS_score_mapping_csv"])
+    .filter(pl.col("phenotype") == pl.lit(phenotype_col))
+)
+prs_score_mapping
+
+# %%
+restricted_formula_template = [
+    *config["restricted_formula"],
+    *prs_score_mapping["pgs_id"],
+]
 restricted_formula = "\n + ".join(restricted_formula_template)
 
 config["restricted_formula"] = restricted_formula
@@ -147,8 +161,11 @@ print(json.dumps(config, indent=2, default=str))
 with open(snakemake.output["covariates_config"], "w") as fd:
     yaml.dump(config, fd, sort_keys=False)
 
-# %% [markdown] {"jp-MarkdownHeadingCollapsed": true, "tags": []}
+# %% [markdown] {"tags": []}
 # # Read metadata
+
+# %% [markdown]
+# ## phenotypes
 
 # %%
 phenotype_metadata_df = pd.read_parquet(snakemake.input["phenotype_metadata_pq"])
@@ -166,10 +183,7 @@ covariate_cols = list(dict.fromkeys(
 covariate_cols
 
 # %%
-meta_cols = [c for c in covariate_cols if c not in {
-    "{CLMP}",
-    "{PRS}",
-}]
+meta_cols = [c for c in covariate_cols if c not in prs_score_mapping["pgs_id"].to_list()]
 phenotype_metadata_subset = phenotype_metadata_df.set_index("col.name").loc[[
     phenotype_col,
     *meta_cols,
@@ -286,7 +300,7 @@ mac_index_vars = mac_index_vars.with_columns([pl.col(c).cast(pl.Int8).alias(c) f
 import pyranges as pr
 
 # %%
-genome_annotation = pr.read_gtf(snakemake.input["genome_annotation"], as_df=True)
+genome_annotation = pr.read_gtf(snakemake.input["clumping_genome_annotation"], as_df=True)
 gene_annoation = genome_annotation[genome_annotation.Feature == "gene"]
 gene_annoation
 
@@ -320,23 +334,56 @@ clumping_meta_df
 clumping_meta_df.to_parquet(snakemake.output["clumping_variants_pq"])
 
 # %% [markdown]
-# ## join everything
+# ## PRS
+
+# %%
+pgs_dfs = []
+for pgs_id, pgs_score_file_path in prs_score_mapping.select(["pgs_id", "pgs_score_file_path"]).rows():
+    print(f"Loading '{pgs_id}'...")
+    pgs_df = (
+        pl.read_csv(pgs_score_file_path, sep="\t")
+        .lazy()
+        .rename({
+            "#IID": "individual",
+            "SCORE1_AVG": pgs_id,
+        })
+        .with_column(pl.col("individual").str.extract("([^_]+).*", 1))
+        .select([
+            "individual",
+            pgs_id,
+        ])
+    )
+    pgs_dfs.append(pgs_df)
+
+# %%
+len(pgs_dfs)
+
+# %%
+import functools
+pgs_df = functools.reduce(lambda df1, df2: df1.join(df2, on="individual", how="outer"), pgs_dfs)
+
+# %% [markdown]
+# # join everything
 
 # %% {"tags": []}
 covariates_df = (
     samples_df.lazy()
     .join(data_df, on="individual", how="left")
+    .join(pgs_df, on="individual", how="left")
     .join(mac_index_vars, on="individual", how="left")
     .filter(pl.col(phenotype_col).is_not_null())
-    .collect()
 )
-covariates_df
+covariates_df.schema
 
 # %%
-covariates_df.write_parquet(
-    snakemake.output["covariates_pq"],
-    compression="snappy",
-    use_pyarrow=True,
+(
+    covariates_df
+    .collect()
+    .write_parquet(
+        snakemake.output["covariates_pq"],
+        compression="snappy",
+        use_pyarrow=True,
+    )
 )
 
 # %%
