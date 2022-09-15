@@ -15,8 +15,10 @@ rule feature_sets__loftee_plof:
     output:
         data_pq=directory(f"{OUTPUT_BASEPATH}/data.parquet"),
         data_pq_done=touch(f"{OUTPUT_BASEPATH}/data.parquet.done"),
+        stats_tsv=directory(f"{OUTPUT_BASEPATH}/stats.tsv"),
     input:
         vep_predictions=config["vep_predictions"],
+        vep_variants=config["vep_variants"],
     params:
         nb_script=f"{SCRIPT}",
 #     log:

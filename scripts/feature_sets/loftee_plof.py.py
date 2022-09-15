@@ -73,7 +73,54 @@ df = (
 )
 df.printSchema()
 
+plof_stats = (
+    df
+    .groupby("individual")
+    .agg(
+        f.sum(f.col("pLoF")).alias("pLoF"),
+    )
+    .groupby()
+    .agg(
+        f.sum(f.col("pLoF")).alias("pLoF_total_calls"),
+        f.mean(f.col("pLoF")).alias("pLoF_average_per_individual"),
+    )
+    .toPandas()
+)
+plof_stats
+
+variants_df = (
+    spark.read.parquet(snakemake.input["vep_variants"])
+    .select(
+        "chrom",
+        "start",
+        "end",
+        "ref",
+        "alt",
+        "gene",
+        (f.col("features")["LoF_HC.sum"] > 0).alias("is_pLoF_variant")
+    )
+)
+variants_df.printSchema()
+
+total_num_pLoF_variants = (
+    variants_df
+    .groupby("chrom", "start", "end", "ref", "alt")
+    .agg(
+        f.max(f.col("is_pLoF_variant")).alias("is_pLoF_variant")
+    )
+    .filter("is_pLoF_variant")
+    .count()
+)
+    # .select("pLoF").distinct().toPandas()
+
+plof_stats["total_num_pLoF_variants"] = total_num_pLoF_variants
+plof_stats
+
 # # Save output
+
+snakemake.output['stats_tsv']
+
+plof_stats.to_csv(snakemake.output['stats_tsv'], index=False, sep="\t")
 
 snakemake.output['data_pq']
 
