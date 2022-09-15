@@ -90,7 +90,8 @@ except NameError:
         rule_name = 'associate__compare_genebass',
         default_wildcards={
             "phenotype_col": "hdl_cholesterol_f30760_0_0",
-            "feature_set": "max_AbExp",
+            "feature_set": "LOFTEE_pLoF",
+            "covariates": "sex+age+genPC",
         }
     )
 
@@ -118,7 +119,7 @@ phenotype_col = snakemake.wildcards["phenotype_col"]
 phenotype_col
 
 # %%
-phenocode = config["phenocode"]
+phenocode = config["covariates"]["phenocode"]
 phenocode
 
 # %% [markdown]
@@ -150,6 +151,15 @@ regression_results_df = regression_results_df.assign(padj=np.fmin(regression_res
 
 display(regression_results_df)
 
+# %%
+regression_results_df["padj"].quantile(q=[0.5, 0.05, 0.001])
+
+# %%
+(regression_results_df["padj"] < 0.05).sum()
+
+# %%
+# regression_results_df[regression_results_df["padj"] < 0.05]
+
 # %% {"tags": []}
 genebass_sdf = (
     spark.read.parquet(snakemake.input["genebass_pq"])
@@ -163,12 +173,6 @@ genebass_pd_df = genebass_sdf.toPandas()
 
 # %%
 genebass_pd_df
-
-# %%
-regression_results_df["padj"].quantile(q=[0.5, 0.05, 0.001])
-
-# %%
-(regression_results_df["padj"] < 0.05).sum()
 
 # %%
 adj_genebass_regression_results_df = (
@@ -372,7 +376,7 @@ stats_df = (
     .assign(rsquared_diff=regression_results_df["rsquared"] - regression_results_df["rsquared_restricted"])
     .set_index("gene")
     .loc[:, [
-        'n_samples', 'loglikelihood',
+        'n_observations', 'loglikelihood',
         'lr_stat', 'lr_df_diff', 'rsquared_restricted',
         'rsquared', 'rsquared_diff', 'lr_pval', 'padj',
     ]]
