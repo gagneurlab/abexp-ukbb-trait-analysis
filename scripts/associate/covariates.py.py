@@ -57,7 +57,7 @@ except NameError:
         default_wildcards={
             "phenotype_col": "hdl_cholesterol_f30760_0_0",
             # "covariates": "sex+age+genPC+CLMP",
-            "covariates": "sex+age+genPC+CLMP+PRS",
+            "covariates": "sex_age_genPC",
         }
     )
 
@@ -117,26 +117,6 @@ config["clumping_gene_padding"]
 config["add_PRS"] = config.get("add_PRS", False)
 config["add_PRS"]
 
-# %% [markdown]
-# ## PRS
-
-# %%
-prs_score_mapping = (
-    pl.read_csv(snakemake.input["PRS_score_mapping_csv"])
-    .filter(pl.col("phenotype") == pl.lit(phenotype_col))
-)
-prs_score_mapping
-
-# %%
-restricted_formula_template = [
-    *config["restricted_formula"],
-    *prs_score_mapping["pgs_id"],
-]
-restricted_formula = "\n + ".join(restricted_formula_template)
-
-config["restricted_formula"] = restricted_formula
-print(restricted_formula)
-
 # %%
 phenotype_col = snakemake.wildcards["phenotype_col"]
 phenotype_col
@@ -154,8 +134,34 @@ phenocode
 # %%
 config["phenocode"] = phenocode
 
+# %% [markdown]
+# ## PRS
+
+# %%
+prs_score_mapping = (
+    pl.read_csv(snakemake.input["PRS_score_mapping_csv"])
+    .filter(pl.col("phenotype") == pl.lit(phenotype_col))
+)
+prs_score_mapping
+
+# %% [markdown]
+# ## restricted formula
+
+# %%
+restricted_formula_template = [
+    *config["restricted_formula"],
+    *(prs_score_mapping["pgs_id"] if config["add_PRS"] else []),
+]
+restricted_formula = "\n + ".join(restricted_formula_template)
+
+config["restricted_formula"] = restricted_formula
+print(restricted_formula)
+
 # %%
 print(json.dumps(config, indent=2, default=str))
+
+# %% [markdown]
+# ## write config.yaml
 
 # %%
 with open(snakemake.output["covariates_config"], "w") as fd:
