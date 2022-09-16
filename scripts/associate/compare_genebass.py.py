@@ -25,11 +25,7 @@ import pandas as pd
 import json
 import yaml
 
-import pyspark
-import pyspark.sql.types as t
-import pyspark.sql.functions as f
-
-import glow
+import polars as pl
 
 
 # %%
@@ -48,29 +44,6 @@ import matplotlib.pyplot as plt
 # # os.environ["RAY_ADDRESS"] = os.environ.get("RAY_ADDRESS", 'ray://192.168.16.30:10001')
 # os.environ["RAY_ADDRESS"] = 'ray://192.168.16.28:10001'
 # os.environ["RAY_ADDRESS"]
-
-# %% {"tags": []}
-from rep.notebook_init import init_spark
-spark = init_spark()
-
-# %% [raw]
-# from rep.notebook_init import init_ray
-# init_ray()
-
-# %% [raw] {"tags": []}
-# import ray
-# from rep.notebook_init import init_spark_on_ray
-# spark = init_spark_on_ray(
-#     # executor_cores=128,
-#     executor_memory_overhead=0.9,
-#     # configs={
-#     #     "spark.default.parallelism": int(ray.cluster_resources()["CPU"]),
-#     #     "spark.sql.shuffle.partitions": 2048,
-#     # }
-# )
-
-# %%
-spark
 
 # %%
 snakefile_path = os.getcwd() + "/../../Snakefile"
@@ -126,8 +99,8 @@ phenocode
 # ## read protein-coding genes
 
 # %%
-protein_coding_genes_df = pd.read_parquet(snakemake.input["protein_coding_genes_pq"])#[["gene_id", "gene_name"]]
-protein_coding_genes_df
+protein_coding_genes_df = pl.scan_parquet(snakemake.input["protein_coding_genes_pq"])
+protein_coding_genes_df.head().collect()
 
 # %% [markdown] {"tags": []}
 # ## read association results
@@ -137,22 +110,28 @@ snakemake.input["associations_pq"]
 
 # %%
 regression_results_df = (
-    spark.read.parquet(snakemake.input["associations_pq"])
-    .sort("rsquared", ascending=False)
-    .drop(
+    pl.scan_parquet(snakemake.input["associations_pq"] + "/*.parquet")
+    .sort("rsquared", reverse=True)
+    .drop([
         "term_pvals",
         "params",
-    )
-    .toPandas()
+    ])
+    .with_column(pl.min([
+        pl.col("lr_pval") * pl.count(),
+        1.0,
+    ]).alias("padj"))
+    .with_column((pl.col("rsquared") - pl.col("rsquared_restricted")).alias("rsquared_diff"))
+    .collect()
+    # .to_pandas()
 )
 
-print(f"Correcting for {regression_results_df.shape[0]} association tests...")
-regression_results_df = regression_results_df.assign(padj=np.fmin(regression_results_df["lr_pval"] * regression_results_df.shape[0], 1))
+print(f"Corrected for {regression_results_df.shape[0]} association tests...")
+# regression_results_df = regression_results_df.assign(padj=np.fmin(regression_results_df["lr_pval"] * regression_results_df.shape[0], 1))
 
 display(regression_results_df)
 
 # %%
-regression_results_df["padj"].quantile(q=[0.5, 0.05, 0.001])
+regression_results_df["padj"].to_pandas().quantile(q=[0.5, 0.05, 0.001])
 
 # %%
 (regression_results_df["padj"] < 0.05).sum()
@@ -161,37 +140,31 @@ regression_results_df["padj"].quantile(q=[0.5, 0.05, 0.001])
 # regression_results_df[regression_results_df["padj"] < 0.05]
 
 # %% {"tags": []}
-genebass_sdf = (
-    spark.read.parquet(snakemake.input["genebass_pq"])
-    .filter(f.col("annotation") == f.lit("pLoF"))
-    .filter(f.col("phenocode") == f.lit(phenocode))
+genebass_df = (
+    pl.scan_parquet(snakemake.input["genebass_pq"] + "/*.parquet")
+    .filter(pl.col("annotation") == pl.lit("pLoF"))
+    .filter(pl.col("phenocode") == pl.lit(phenocode))
+    # .collect()
 )
-genebass_sdf.printSchema()
-
-# %% {"tags": []}
-genebass_pd_df = genebass_sdf.toPandas()
+genebass_df.schema
 
 # %%
-genebass_pd_df
-
-# %%
-adj_genebass_regression_results_df = (
-    genebass_pd_df
-    .rename(columns={
+genebass_df = (
+    genebass_df
+    .rename({
         "gene_id": "gene",
         "Pvalue": "lr_pval",
     })
-    .assign(score_type="Genebass")
-    .astype({"score_type": "string[pyarrow]"})
+    .with_column(pl.min([
+        pl.col("lr_pval") * pl.count(),
+        1.0,
+    ]).alias("padj"))
 )
-adj_genebass_regression_results_df["padj"] = np.fmin(adj_genebass_regression_results_df["lr_pval"] * adj_genebass_regression_results_df.shape[0], 1)
-adj_genebass_regression_results_df
+genebass_df.schema
 
 # %%
-adj_genebass_regression_results_df["padj"].quantile(q=[0.5, 0.05])
-
-# %%
-(adj_genebass_regression_results_df["padj"] < 0.05).sum()
+genebass_df = genebass_df.collect()
+genebass_df
 
 # %%
 # adj_joint_regression_results_df = (
@@ -210,13 +183,11 @@ adj_genebass_regression_results_df["padj"].quantile(q=[0.5, 0.05])
 # (adj_joint_regression_results_df["padj"] < 0.05).sum()
 
 # %%
+
+# %%
 combined_regression_results_df = pd.concat([
-    (
-        regression_results_df
-        .assign(score_type=snakemake.wildcards["feature_set"])
-        .astype({"score_type": "string[pyarrow]"})
-    ),
-    adj_genebass_regression_results_df,
+    regression_results_df.with_column(pl.lit(snakemake.wildcards["feature_set"]).alias("score_type")).to_pandas(),
+    genebass_df.with_column(pl.lit("Genebass").alias("score_type")).to_pandas(),
 ], join="inner")
 
 combined_regression_results_df = (
@@ -225,7 +196,7 @@ combined_regression_results_df = (
     .unstack("score_type")
     # .fillna(1)
     .sort_values(snakemake.wildcards["feature_set"])
-    .merge(protein_coding_genes_df.rename(columns={"gene_id": "gene"}), on="gene", how="left")
+    .merge(protein_coding_genes_df.collect().to_pandas().rename(columns={"gene_id": "gene"}), on="gene", how="left")
     .set_index(["gene", "gene_name"])
     # # filter for Genebass genes
     # .dropna(subset=["Genebass"])
@@ -361,6 +332,7 @@ significant_genes = (
         f"{y}_signif": (combined_regression_results_df[y] < cutoff),
     })
     .query(f"{x}_signif | {y}_signif")
+    # .query(f"{y}_signif")
     .loc[:, [
         y,
         f"{y}_signif",
@@ -372,8 +344,7 @@ significant_genes = (
 
 # %%
 stats_df = (
-    regression_results_df
-    .assign(rsquared_diff=regression_results_df["rsquared"] - regression_results_df["rsquared_restricted"])
+    regression_results_df.to_pandas()
     .set_index("gene")
     .loc[:, [
         'n_observations', 'loglikelihood',
@@ -394,7 +365,7 @@ with pd.option_context('display.float_format', '{:,.2g}'.format):
 stats_df.reset_index().to_parquet(snakemake.output["significant_genes_pq"], index=False)
 
 # %%
-stats_df.reset_index().to_csv(snakemake.output["significant_genes_tsv"], index=False, header=True, sep="\t", float_format='{:,.2g}'.format)
+stats_df.reset_index().to_csv(snakemake.output["significant_genes_tsv"], index=False, header=True, sep="\t")
 
 # %%
 

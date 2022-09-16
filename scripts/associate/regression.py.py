@@ -497,8 +497,18 @@ regression_results_sdf = regression(
 )
 regression_results_sdf.printSchema()
 
+# %%
+for k, v in snakemake.wildcards.items():
+    regression_results_sdf = regression_results_sdf.withColumn(k, f.lit(v))
+
+# %%
+regression_results_sdf.printSchema()
+
 # %% {"tags": []}
 regression_results_sdf.write.parquet(snakemake.output["associations_pq"], mode="overwrite")
+
+# %%
+# regression_results_sdf = spark.read.parquet(snakemake.output["associations_pq"])
 
 # %% [raw] {"tags": []}
 # # read association results
