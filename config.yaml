@@ -16,6 +16,7 @@ genebass_results_mt: "/s/project/rep/processed/genebass/results.mt"
 # output
 genebass_results_pq: "/s/project/rep/processed/genebass/results.parquet"
 genebass_results_filtered_pq: "/s/project/rep/processed/genebass/filtered.parquet"
+genebass_filtered_phenotypes_pq: "/s/project/rep/processed/genebass/filtered_phenotypes.parquet"
 genebass_bonferroni_cutoff: 0.01
 
 # config_dir will be copied to output_basedir

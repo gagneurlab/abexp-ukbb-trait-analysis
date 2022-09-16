@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.10.2
+#       jupytext_version: 1.14.0
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -38,7 +38,7 @@ spark = init_spark()
 
 spark
 
-snakefile_path = os.getcwd() + "/../Snakefile"
+snakefile_path = os.getcwd() + "/../../Snakefile"
 snakefile_path
 
 # +
@@ -118,14 +118,14 @@ filtered_genebass_df = (
 )
 filtered_genebass_df.printSchema()
 
-filtered_genebass_df.select("phenocode").distinct().toPandas().sort_values("phenocode")
-
 filtered_genebass_df.select("annotation").distinct().toPandas()
 
 # +
 # filtered_genebass_pd_df = filtered_genebass_df.toPandas()
 # filtered_genebass_pd_df
 # -
+
+# # write filtered genebass df
 
 (
     filtered_genebass_df
@@ -136,5 +136,70 @@ filtered_genebass_df.select("annotation").distinct().toPandas()
     .write
     .parquet(FILTERED_PQ, mode="overwrite")
 )
+
+# # Filter phenotypes
+
+phenotype_metadata_df = spark.read.parquet(snakemake.input["phenotype_metadata_pq"])
+phenotype_metadata_df = phenotype_metadata_df.withColumnRenamed("field.showcase", "phenocode")
+phenotype_metadata_df.printSchema()
+
+phenotypes_df = (
+    filtered_genebass_df
+    .sort("phenocode", "annotation")
+    .groupby(
+        # "annotation",
+        "trait_type",
+        "n_cases",
+        "n_controls",
+        "heritability",
+        "phenocode",
+        "pheno_sex",
+        "coding",
+        "modifier",
+    )
+    .agg(
+        f.collect_set(f.col("annotation")).alias("annotation"),
+        f.count(f.col("gene_id")).alias("num_significant_gene_associations"),
+    )
+    .persist()
+    # .count()
+    # .toPandas().astype({"n_controls": "Int32"})
+)
+phenotypes_df
+
+filtered_phenotypes_df = (
+    phenotypes_df
+    .filter(
+        (f.col("num_significant_gene_associations") > f.lit(1))
+        & (f.col("annotation") != f.array(f.lit("synonymous")))
+    )
+    .withColumn(
+        "total_num_samples", 
+        f.col("n_cases") + f.when(f.col("n_controls").isNotNull(), f.col("n_controls")).otherwise(f.lit(0))
+    )
+)
+filtered_phenotypes_df.toPandas()
+
+joint_phenotypes_df = (
+    filtered_phenotypes_df
+    .join(phenotype_metadata_df.select("phenocode").distinct(), on="phenocode", how="inner")
+    .filter(f.col("coding") == f.lit(""))
+)
+joint_phenotypes_df.toPandas().astype({"n_controls": "Int32"})
+
+display(
+    joint_phenotypes_df
+    .join(phenotype_metadata_df, on="phenocode", how="inner")
+    .toPandas().astype({"n_controls": "Int32"})
+    .query("`col.name`.str.endswith('_0_0')")
+    .loc[:, "col.name"].sort_values().values
+)
+
+phenocodes = joint_phenotypes_df.select("phenocode").distinct().toPandas()["phenocode"]
+phenocodes.sort_values().values
+
+len(phenocodes)
+
+joint_phenotypes_df.toPandas().astype({"n_controls": "Int32"}).to_parquet(snakemake.output["filtered_phenotypes_pq"])
 
 

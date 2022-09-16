@@ -11,8 +11,10 @@ rule filter_genebass:
         mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
     output:
         results_filtered_pq=config["genebass_results_filtered_pq"],
+        filtered_phenotypes_pq=config["genebass_filtered_phenotypes_pq"],
     input:
         results_pq=config["genebass_results_pq"],
+        phenotype_metadata_pq=f"{UKBB_PROCESSED_PHENOTYPES_DIR}/latest.meta.parquet",
     conda: f'{CONDA_ENV_YAML_DIR}/ukbb-trait-analysis-R.yaml'
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
