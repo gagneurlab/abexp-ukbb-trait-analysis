@@ -61,6 +61,7 @@ rule all:
 #         rules.Index.output, 
 #         expand('/s/project/bayesRare/UKBB_Splicing_Analysis/results/{phenocode}/boxplot.png', phenocode = set(associations.phenocode))
         *hdl_cholesterol,
+        expand(rules.compare_associations.output, comparison=["all"]),
 
 
 localrules: all

@@ -10,7 +10,7 @@ rule filter_genebass:
         ntasks=1,
         mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
     output:
-        results_filtered_pq=config["genebass_results_filtered_pq"],
+        results_filtered_pq=directory(config["genebass_results_filtered_pq"]),
         filtered_phenotypes_pq=config["genebass_filtered_phenotypes_pq"],
     input:
         results_pq=config["genebass_results_pq"],

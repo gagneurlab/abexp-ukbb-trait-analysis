@@ -90,17 +90,17 @@ except NameError:
         default_wildcards={
             "phenotype_col": "hdl_cholesterol_f30760_0_0",
             # "feature_set": "LOFTEE_pLoF",
-            # "feature_set": "AbExp_pivot",
-            "feature_set": "LOFTEE_pLoF",
+            "feature_set": "AbExp_all_tissues",
+            # "feature_set": "LOFTEE_pLoF",
             # "covariates": "sex+age+genPC+CLMP",
-            "covariates": "sex+age+genPC",
+            "covariates": "sex_age_genPC",
         }
     )
 
 # %%
 print(json.dumps(snakemake.__dict__, indent=2, default=str))
 
-# %% [markdown]
+# %% [markdown] {"tags": []}
 # # Load configuration
 
 # %%
@@ -417,7 +417,11 @@ protein_coding_genes_df.printSchema()
 # %%
 feature_dfs = {}
 for feature_name, path in config["feature_sets"].items():
-    feature_dfs[feature_name] = spark.read.parquet(path + "/data.parquet")
+    feature_dfs[feature_name] = (
+        spark.read.parquet(path + "/data.parquet")
+        .filter(f.col("individual").isNotNull())
+        .filter(f.col("gene").isNotNull())
+    )
 
 # %%
 len(feature_dfs)
@@ -436,10 +440,17 @@ features_df = join_featuresets(
     variables=config["variables"],
     index_cols=["individual", *groupby_columns],
     fill_values=fill_values,
-    join="left",
-    initial_df=protein_coding_genes_df
-).filter(f.col("individual").isNotNull())
+    join="outer",
+)
+features_df = protein_coding_genes_df.join(
+    features_df,
+    on=["gene"],
+    how="inner"
+)
 features_df.printSchema()
+
+# %%
+# features_df.select("gene").distinct().count()
 
 # %%
 renamed_features_df = features_df
