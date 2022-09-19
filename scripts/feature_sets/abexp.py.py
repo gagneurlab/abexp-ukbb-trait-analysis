@@ -42,7 +42,7 @@ spark
 snakefile_path = os.getcwd() + "/../../Snakefile"
 
 # +
-#del snakemake
+# del snakemake
 # -
 
 try:
@@ -54,9 +54,9 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'feature_sets__abexp',
         default_wildcards={
-            'agg': "max",
+            # 'agg': "max",
             # 'agg': "mean",
-            # 'agg': "median",
+            'agg': "median",
         }
     )
 
@@ -84,11 +84,12 @@ if snakemake.wildcards["agg"] == "max":
     )
 elif snakemake.wildcards["agg"] == "mean":
     agg_df = agg_df.agg(
-        f.max(f.col("y_pred_proba")).alias("mean_AbExp")
+        f.mean(f.col("y_pred_proba")).alias("mean_AbExp")
     )
 elif snakemake.wildcards["agg"] == "median":
     agg_df = agg_df.agg(
-        f.max(f.col("y_pred_proba")).alias("median_AbExp")
+        f.expr('percentile(y_pred_proba, array(0.5))')[0].alias("median_AbExp")
+        # f.median(f.col("y_pred_proba")).alias("median_AbExp")
     )
 else:
     raise ValueError(f"""Unknown aggregation type: '{snakemake.wildcards["agg"]}'""")
