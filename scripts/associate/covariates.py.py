@@ -55,9 +55,11 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'covariates',
         default_wildcards={
-            "phenotype_col": "hdl_cholesterol_f30760_0_0",
+            # "phenotype_col": "hdl_cholesterol_f30760_0_0",
+            "phenotype_col": "systolic_blood_pressure_f4080_0_0",
+            "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex+age+genPC+CLMP",
-            "covariates": "sex_age_genPC",
+            # "covariates": "sex_age_genPC",
         }
     )
 
@@ -135,7 +137,7 @@ phenocode
 config["phenocode"] = phenocode
 
 # %% [markdown]
-# ## PRS
+# ## PRS / Clumping
 
 # %%
 prs_score_mapping = (
@@ -143,6 +145,10 @@ prs_score_mapping = (
     .filter(pl.col("phenotype") == pl.lit(phenotype_col))
 )
 prs_score_mapping
+
+# %%
+mac_index_variants_path = prs_score_mapping.select("clumping_var_file_path").unique().to_numpy().item()
+mac_index_variants_path
 
 # %% [markdown]
 # ## restricted formula
@@ -270,12 +276,19 @@ data_df.schema
 # %% [markdown]
 # ### read clumping variant calls
 
+# %%
+mac_index_variants_path
+
 # %% {"tags": []}
 mac_index_vars = (
-    pl.scan_parquet(snakemake.input["mac_index_variants"])
-    .rename({"ID": "individual"})
+    pl.scan_parquet(mac_index_variants_path)
+    .rename({"IID": "individual"})
+    .with_column(pl.col("individual").str.extract("([^_]+).*", 1))
 )
 mac_index_vars.schema
+
+# %%
+mac_index_vars.select(mac_index_vars.columns[:6]).head().collect()
 
 # %% [markdown]
 # ### parse clumping variants
@@ -295,12 +308,24 @@ variants = (
         (pl.col("pos") - 1).alias("Start"),
         (pl.col("pos") - 1 + pl.col("ref").str.lengths()).alias("End"),
     ])
+    .filter((
+        pl.col("Chromosome").is_not_null()
+        & pl.col("pos").is_not_null()
+        & pl.col("ref").is_not_null()
+        & pl.col("alt").is_not_null()
+    ))
 )
 variants
 
 # %%
 # cast data to save memory
-mac_index_vars = mac_index_vars.with_columns([pl.col(c).cast(pl.Int8).alias(c) for c in variants["variant"]])
+mac_index_vars = (
+    mac_index_vars
+    .select([
+        "individual",
+        *[pl.col(c).cast(pl.Int8).alias(c) for c in variants["variant"]],
+    ])
+)
 
 # %% {"tags": []}
 import pyranges as pr
@@ -378,19 +403,28 @@ covariates_df = (
     .join(pgs_df, on="individual", how="left")
     .join(mac_index_vars, on="individual", how="left")
     .filter(pl.col(phenotype_col).is_not_null())
+    .fill_null(0)
+    .collect()
 )
 covariates_df.schema
 
 # %%
 (
     covariates_df
-    .collect()
     .write_parquet(
         snakemake.output["covariates_pq"],
         compression="snappy",
         use_pyarrow=True,
     )
 )
+
+# %%
+#(
+#    pl.read_parquet(snakemake.output["covariates_pq"])
+#    .write_ipc(
+#        snakemake.output["covariates_ipc"],
+#    )
+#)
 
 # %%
 

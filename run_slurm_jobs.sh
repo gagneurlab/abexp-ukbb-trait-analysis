@@ -97,11 +97,12 @@ if [ "${AUKS_ENABLED:-false}" = true ]; then
 fi
 
 $snakemake --keep-going \
-           --default-resources ntasks=1 mem_mb=1000 gpu=0 \
+           --default-resources smt=1 ntasks=1 mem_mb=1000 gpu=0 \
            --cluster "sbatch $SBATCH_ARGS \
                              --ntasks {resources.ntasks} \
                              --cpus-per-task {threads} \
                              --parsable \
+							 \$(test '{resources.smt}' -eq 0 && echo '--hint=nomultithread' || echo '') \
                              --mem {resources.mem_mb}M \
                              --output $output_files \
                              --job-name=$job_names-{rule} \

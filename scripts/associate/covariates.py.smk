@@ -9,7 +9,7 @@ TEMPLATE_FILE=f"{SNAKEFILE_DIR}/covariates@{{covariates}}.yaml"
 
 
 rule covariates:
-    threads: 16
+    threads: 48
     resources:
         mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
     output:
@@ -24,7 +24,7 @@ rule covariates:
         phenotype_metadata_pq=f"{UKBB_PROCESSED_PHENOTYPES_DIR}/latest.meta.parquet",
         covariates_config=TEMPLATE_FILE,
         # clumping
-        mac_index_variants=config["mac_index_variants"],
+        # mac_index_variants=config["mac_index_variants"],
         clumping_genome_annotation=config["clumping_gtf_file"],
         # PRS scores
         PRS_score_mapping_csv=config["PRS_score_mapping"],
@@ -42,6 +42,23 @@ rule covariates:
     script:
         "{params.nb_script}.py"
 
+        
+rule covariates_to_ipc:
+    threads: 4
+    resources:
+        mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
+    output:
+        covariates_ipc=temp(f"{OUTPUT_BASEPATH}/covariates.feather"),
+    input:
+        covariates_pq=f"{OUTPUT_BASEPATH}/covariates.parquet",
+    wildcard_constraints:
+        covariates="[^/]+",
+    run:
+        import polars as pl
+        (
+            pl.read_parquet(input["covariates_pq"])
+            .write_ipc(output["covariates_ipc"])
+        )
 
 del OUTPUT_BASEPATH
 del TEMPLATE_FILE

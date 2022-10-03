@@ -10,9 +10,10 @@ TEMPLATE_FILE=f"{SNAKEFILE_DIR}/regression@{{feature_set}}.yaml"
 
 
 rule associate__regression:
-    threads: 128
+    threads: 64
     resources:
-        mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
+        mem_mb=lambda wildcards, attempt, threads: (8000 * threads) * attempt,
+        smt=0,
     output:
         associations_pq=directory(OUTPUT_BASEPATH + "/associations.parquet"),
         # config=f"{OUTPUT_BASEPATH}/config.yaml",
@@ -24,7 +25,7 @@ rule associate__regression:
         featureset_config=f"{OUTPUT_BASEPATH}/config.yaml",
         protein_coding_genes_pq=config["protein_coding_genes_pq"],
         # covariates
-        covariates_pq=f'''{COVARIATES_BASEPATH}/covariates.parquet''',
+        covariates_ipc=f'''{COVARIATES_BASEPATH}/covariates.feather''',
         # clumping
         clumping_variants_pq=f'''{COVARIATES_BASEPATH}/clumping_variants.parquet''',
     params:

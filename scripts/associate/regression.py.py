@@ -32,6 +32,13 @@ import pyspark.sql.functions as f
 import glow
 
 # %%
+import polars as pl
+
+# %%
+import re
+import patsy
+
+# %%
 import plotnine as pn
 # import seaborn as sns
 
@@ -48,25 +55,39 @@ import matplotlib.pyplot as plt
 # os.environ["RAY_ADDRESS"] = 'ray://192.168.16.28:10001'
 # os.environ["RAY_ADDRESS"]
 
-# %% {"tags": []}
-from rep.notebook_init import init_spark
-spark = init_spark()
-
-# %% [raw]
-# from rep.notebook_init import init_ray
-# init_ray()
-
 # %% [raw] {"tags": []}
-# import ray
-# from rep.notebook_init import init_spark_on_ray
-# spark = init_spark_on_ray(
-#     # executor_cores=128,
-#     executor_memory_overhead=0.9,
-#     # configs={
-#     #     "spark.default.parallelism": int(ray.cluster_resources()["CPU"]),
-#     #     "spark.sql.shuffle.partitions": 2048,
-#     # }
-# )
+#
+
+# %%
+# we need ray to efficiently share the covariates df in memory
+# use_ray = True
+use_ray = False
+
+# %% {"tags": []}
+ray = None
+ray_context = None
+if use_ray:
+    import ray
+    from rep.notebook_init import init_ray
+    ray_context = init_ray(
+        plasma_store_memory_fraction=0.3
+    )
+
+    from rep.notebook_init import init_spark_on_ray
+    spark = init_spark_on_ray(
+        # executor_cores=128,
+        executor_memory_overhead=0.9,
+        # configs={
+        #     "spark.default.parallelism": int(ray.cluster_resources()["CPU"]),
+        #     "spark.sql.shuffle.partitions": 2048,
+        # }
+    )
+else:
+    from rep.notebook_init import init_spark
+    spark = init_spark()
+
+# %%
+ray_context
 
 # %%
 spark
@@ -76,7 +97,7 @@ snakefile_path = os.getcwd() + "/../../Snakefile"
 snakefile_path
 
 # %%
-# del snakemake
+#del snakemake
 
 # %%
 try:
@@ -88,12 +109,17 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__regression',
         default_wildcards={
-            "phenotype_col": "hdl_cholesterol_f30760_0_0",
+            "phenotype_col": "triglycerides_f30870_0_0",
+            # "phenotype_col": "standing_height_f50_0_0",
+            # "phenotype_col": "body_mass_index_bmi_f21001_0_0",
+            # "phenotype_col": "systolic_blood_pressure_automated_reading_f4080_0_0",
+            # "phenotype_col": "hdl_cholesterol_f30760_0_0",
+            "feature_set": "LOFTEE_pLoF",
+            # "feature_set": "AbExp_all_tissues",
             # "feature_set": "LOFTEE_pLoF",
-            "feature_set": "AbExp_all_tissues",
-            # "feature_set": "LOFTEE_pLoF",
-            # "covariates": "sex+age+genPC+CLMP",
-            "covariates": "sex_age_genPC",
+            # "covariates": "sex_age_genPC_CLMP_PRS",
+            "covariates": "sex_age_genPC_CLMP",
+            # "covariates": "sex_age_genPC",
         }
     )
 
@@ -126,13 +152,24 @@ print(restricted_formula)
 # # Read covariates
 
 # %%
-covariates_df = pd.read_parquet(snakemake.input["covariates_pq"]).fillna(0)
-covariates_df
+snakemake.input["covariates_ipc"]
 
 # %%
-display(
-    "Size of 'covariates_df': %.3fGb" % (covariates_df.memory_usage(deep=True).sum() / 1024**3)
-)
+covariates_df = pl.scan_ipc(snakemake.input["covariates_ipc"])
+covariates_df_columns = covariates_df.columns
+
+# %% [raw]
+# display(
+#     "Size of 'covariates_df': %.3fGb" % (covariates_df.to_arrow().nbytes / 1024**3)
+# )
+
+# %%
+covariates_sparkfilename = os.path.basename(snakemake.input["covariates_ipc"])
+covariates_sparkfilename
+
+# %%
+# add file to all spark nodes
+spark.sparkContext.addFile(snakemake.input["covariates_ipc"])
 
 # %% [markdown] {"tags": []}
 # ## clumping
@@ -152,9 +189,12 @@ def get_variants_by_gene(clumping_variants_df, gene_id):
 # get_variants_by_gene(clumping_variants_df, gene_id="ENSG00000084674")
 
 # %%
-import re
-
 def format_formula(formula, keys, add_clumping=True, clumping_variants_df=clumping_variants_df):
+    if not isinstance(formula, patsy.ModelDesc):
+        model_desc = patsy.ModelDesc.from_formula(formula)
+    else:
+        model_desc = formula
+    
     if add_clumping:
         if not "gene" in keys:
             raise ValueError(f"missing gene in keys: '{keys}'!")
@@ -164,12 +204,11 @@ def format_formula(formula, keys, add_clumping=True, clumping_variants_df=clumpi
         variants = get_variants_by_gene(clumping_variants_df=clumping_variants_df, gene_id=gene_id)
 
         if len(variants) > 0:
-            formula = "\n + ".join([
-                formula,
-                *[f"Q('{c}')" for c in variants]
-            ])
+            model_desc.rhs_termlist += [
+                patsy.Term([patsy.EvalFactor(f"Q('{c}')")]) for c in variants
+            ]
     
-    return formula
+    return model_desc
 
 
 # %%
@@ -178,7 +217,7 @@ test_formula = format_formula(
     clumping_variants_df=clumping_variants_df,
     add_clumping=True,
     keys={
-        "gene": "ENSG00000084674",
+        "gene": "ENSG00000160584",
     }
 )
 
@@ -195,15 +234,16 @@ test_formula_2 = format_formula(
     }
 )
 
+
 # %%
 # print(test_formula_2)
 
 # %%
-import patsy
-import re
-
 def get_variables_from_formula(formula, lhs=True, rhs=True):
-    model_desc = patsy.ModelDesc.from_formula(formula)
+    if not isinstance(formula, patsy.ModelDesc):
+        model_desc = patsy.ModelDesc.from_formula(formula)
+    else:
+        model_desc = formula
 
     covariate_cols = [
         *([factor.name() for term in model_desc.lhs_termlist for factor in term.factors] if lhs else []),
@@ -222,9 +262,36 @@ def get_variables_from_formula(formula, lhs=True, rhs=True):
 # %%
 # get_variables_from_formula(test_formula)
 
+# %%
+def broadcast(obj, idempotent=True):
+    if idempotent:
+        if isinstance(obj, pyspark.Broadcast):
+            return obj
+        elif ray is not None and isinstance(obj, ray.ObjectRef):
+            return obj
+        elif isinstance(obj, str):
+            return obj
+    
+    if use_ray:
+        return ray.put(obj)
+    else:
+        return spark.sparkContext.broadcast(obj)
+
+
+# %%
+def deref(obj):
+    if isinstance(obj, pyspark.Broadcast):
+        return obj.value
+    elif ray is not None and isinstance(obj, ray.ObjectRef):
+        with ray_context:
+            return ray.get(obj)
+    else:
+        return obj
+
+
 # %% {"tags": []}
-broadcast_covariates_df = spark.sparkContext.broadcast(covariates_df)
-broadcast_clumping_variants_df = spark.sparkContext.broadcast(clumping_variants_df)
+# broadcast_covariates_df = broadcast(covariates_df.to_arrow())
+broadcast_clumping_variants_df = broadcast(clumping_variants_df)
 
 # %% {"tags": []}
 # restricted_model = smf.ols(
@@ -235,6 +302,13 @@ broadcast_clumping_variants_df = spark.sparkContext.broadcast(clumping_variants_
 #     )
 # ).fit()
 # broadcast_restricted_model = spark.sparkContext.broadcast(restricted_model)
+
+# %%
+# covariates_pq_path = snakemake.input["covariates_pq"]
+# covariates_df_columns = covariates_df.columns
+
+# %%
+from pyarrow import feather
 
 # %% {"tags": []}
 import statsmodels.formula.api as smf
@@ -247,49 +321,41 @@ def regression(
     groupby_columns: Union[str, List[str]], 
     full_formula: str,
     restricted_formula: str,
-    covariates_df: Union[pyspark.Broadcast, pd.DataFrame],
+    # covariates_df: Union[pyspark.Broadcast, pd.DataFrame],
     clumping_variants_df: Union[pyspark.Broadcast, pd.DataFrame] = None,
     add_clumping: bool = config["covariates"]["add_clumping"],
 ):
     if isinstance(groupby_columns, str):
         groupby_columns = [groupby_columns]
     
+    print("broadcasting...")
     # make sure to use broadcasted variable
-    if isinstance(covariates_df, pyspark.Broadcast):
-        broadcast_covariates_df = covariates_df
-    elif isinstance(covariates_df, pd.DataFrame):
-        broadcast_covariates_df = spark.sparkContext.broadcast(covariates_df)
-    else:
-        raise ValueError("'covariates_df' has to be of type pd.DataFrame or pyspark.Broadcast")
+    # broadcast_covariates_df = broadcast(covariates_df, idempotent=True)
     
     if add_clumping:
-        if isinstance(clumping_variants_df, pyspark.Broadcast):
-            broadcast_clumping_variants_df = clumping_variants_df
-        elif isinstance(clumping_variants_df, pd.DataFrame):
-            broadcast_clumping_variants_df = spark.sparkContext.broadcast(clumping_variants_df)
-        else:
-            raise ValueError("'clumping_variants_df' has to be of type pd.DataFrame or pyspark.Broadcast")
+        broadcast_clumping_variants_df = broadcast(clumping_variants_df, idempotent=True)
     else:
         broadcast_clumping_variants_df = None
     
-#     if isinstance(restricted_model, pyspark.Broadcast):
-#         broadcast_restricted_model = restricted_model
-#     else:
-#         broadcast_restricted_model = spark.sparkContext.broadcast(restricted_model)
+    print("broadcasting done")
     
     def fit(pd_df):
         with threadpool_limits(limits=1):
             keys=pd_df.loc[:, groupby_columns].iloc[0].to_dict()
+    
+            # print("dereferencing...")
             
             # ## unpack all broadcast variables
-            covariates_df = broadcast_covariates_df.value
+            # covariates_df = deref(broadcast_covariates_df)
             
             # unpack only if needed
             if add_clumping:
-                clumping_variants_df = broadcast_clumping_variants_df.value
+                clumping_variants_df = deref(broadcast_clumping_variants_df)
             else:
                 clumping_variants_df = None
             # ## unpacking done
+            
+            # print("dereferencing done")
 
             formatted_restricted_formula = format_formula(
                 formula=restricted_formula,
@@ -312,8 +378,22 @@ def regression(
                 *full_variables,
                 "individual",
             }
+            
             # filter covariates for necessary columns
-            covariates_df = covariates_df.loc[:, [c for c in covariates_df.columns if c in necessary_columns]]
+            # covariates_df = covariates_df.select([c for c in covariates_df.column_names if c in necessary_columns]).to_pandas()
+            
+            #covariates_df = pd.read_feather(
+            #    path = pyspark.SparkFiles.get(covariates_sparkfilename),
+            #    columns=[c for c in covariates_df_columns if c in necessary_columns],
+            #    use_threads=False,
+            #)
+            # make sure to use memory-mapping and disable threading
+            covariates_df = feather.read_feather(
+                pyspark.SparkFiles.get(covariates_sparkfilename),
+                columns=[c for c in covariates_df_columns if c in necessary_columns],
+                use_threads=False,
+                memory_map=True
+            )
             
             # merge with phenotype df to make sure that we have all scores predicted
             data_df = covariates_df.merge(pd_df, on=["individual"], how="left")
@@ -375,11 +455,11 @@ def regression(
     )
 
 _test = regression(
-    dataframe=spark.createDataFrame(covariates_df[["individual"]].assign(gene="ENSG00000084674")), 
+    dataframe=spark.createDataFrame(covariates_df.select("individual").collect().to_pandas().assign(gene="ENSG00000084674")), 
     groupby_columns=["gene"],
     full_formula=restricted_formula,
     restricted_formula=restricted_formula,
-    covariates_df=broadcast_covariates_df,
+    # covariates_df=broadcast_covariates_df,
     clumping_variants_df=broadcast_clumping_variants_df,
 ).toPandas()
 
@@ -491,6 +571,10 @@ features
 # scores_sdf.printSchema()
 
 # %%
+# renamed_features_df = renamed_features_df.persist()
+# renamed_features_df.count()
+
+# %%
 full_formula = "\n + ".join([
     restricted_formula,
     *[f"Q('{c}')" for c in features],
@@ -503,7 +587,7 @@ regression_results_sdf = regression(
     groupby_columns=groupby_columns, 
     full_formula=full_formula,
     restricted_formula=restricted_formula,
-    covariates_df=broadcast_covariates_df,
+    # covariates_df=broadcast_covariates_df,
     clumping_variants_df=broadcast_clumping_variants_df,
 )
 regression_results_sdf.printSchema()
@@ -514,6 +598,32 @@ for k, v in snakemake.wildcards.items():
 
 # %%
 regression_results_sdf.printSchema()
+
+# %%
+
+# %%
+# for debugging
+
+# %% [raw]
+# renamed_features_df.select("gene").distinct().limit(10).toPandas()["gene"].tolist()
+
+# %% [raw]
+# %%time
+# test = regression(
+#     renamed_features_df.filter(f.col("gene").isin(
+#         renamed_features_df.select("gene").distinct().limit(64).toPandas()["gene"].tolist()
+#     )).repartition(2, "gene"), 
+#     groupby_columns=groupby_columns, 
+#     full_formula=full_formula,
+#     restricted_formula=restricted_formula,
+#     covariates_df=broadcast_covariates_df,
+#     clumping_variants_df=broadcast_clumping_variants_df,
+# ).toPandas()
+# test
+
+# %%
+
+# %%
 
 # %% {"tags": []}
 regression_results_sdf.write.parquet(snakemake.output["associations_pq"], mode="overwrite")
