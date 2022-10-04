@@ -1,2 +1,8 @@
-phenotype,pgs_id,pgs_score_file_path
-hdl_cholesterol_f30760_0_0,PGS001954,"/s/project/uk_biobank/processed/risk_scores/PGS001954_i/PGS001954.sscore"
+phenotype,pgs_id,pgs_score_file_path,clumping_var_file_path
+hdl_cholesterol_f30760_0_0,PGS001954,"/s/project/uk_biobank/processed/risk_scores/PGS001954/PGS001954.sscore","/s/project/uk_biobank/processed/clumping/30760/GWAS_variants_clumped_mac_30760.parquet.p"
+ldl_direct_f30780_0_0,PGS001933,"/s/project/uk_biobank/processed/risk_scores/PGS001933/PGS001933.sscore","/s/project/uk_biobank/processed/clumping/30780/GWAS_variants_clumped_mac_30780.parquet.p"
+c_reactive_protein_f30710_0_0,PGS001946,"/s/project/uk_biobank/processed/risk_scores/PGS001946/PGS001946.sscore","/s/project/uk_biobank/processed/clumping/30710/GWAS_variants_clumped_mac_30710.parquet.p"
+triglycerides_f30870_0_0,PGS001979,"/s/project/uk_biobank/processed/risk_scores/PGS001979/PGS001979.sscore","/s/project/uk_biobank/processed/clumping/30870/GWAS_variants_clumped_mac_30870.parquet.p"
+standing_height_f50_0_0,PGS001929,"/s/project/uk_biobank/processed/risk_scores/PGS001929/PGS001929.sscore","/s/project/uk_biobank/processed/clumping/50/GWAS_variants_clumped_mac_50.parquet.p"
+body_mass_index_bmi_f21001_0_0,PGS001943,"/s/project/uk_biobank/processed/risk_scores/PGS001943/PGS001943.sscore","/s/project/uk_biobank/processed/clumping/21001/GWAS_variants_clumped_mac_21001.parquet.p"
+systolic_blood_pressure_automated_reading_f4080_0_0,PGS002009,"/s/project/uk_biobank/processed/risk_scores/PGS002009/PGS002009.sscore","/s/project/uk_biobank/processed/clumping/4080/GWAS_variants_clumped_mac_4080.parquet.p"

@@ -34,5 +34,10 @@ abexp_predictions: "/s/project/rep/processed/training_results_v10/ukbb_wes_200k/
 vep_predictions: "/s/project/rep/processed/training_results_v10/ukbb_wes_200k/feature_sets/aggregate_vep_spark.py@gt=any_tl=CANONICAL/data.parquet"
 vep_variants: "/s/project/rep/processed/training_results_v10/ukbb_wes_200k/veff/tissue_specific_vep.py@tl=CANONICAL/veff.parquet"
 # clumping
-mac_index_variants: "/s/project/uk_biobank/processed/clumping/30780/WES_200K_index_vars_mac_30780.parquet.p"
-clumping_gtf_file: "/s/genomes/Gencode/Gencode_human/release_34/gencode.v34.annotation.gtf.gz"
+# mac_index_variants: "/s/project/uk_biobank/processed/clumping/30780/WES_200K_index_vars_mac_30780.parquet.p"
+# clumping_gtf_file: "/s/genomes/Gencode/Gencode_human/release_34/gencode.v34.annotation.gtf.gz"
+clumping_gtf_file: "/s/genomes/Gencode/Gencode_human/release_34/GRCh37_mapping/gencode.v34lift37.annotation.gtf.gz"
+
+
+# misc
+num_samples_per_tissue: '/s/project/rep/processed/training_results_v10/gtex_v8_old_dna/plots/nr_samples_per_tissue.py/samples_per_tissue.parquet'

@@ -36,7 +36,7 @@ rule compare_associations:
         ntasks=1,
         mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
     output:
-        significant_genes_pq=f"{OUTPUT_BASEPATH}/significant_genes.parquet",
+        significant_genes_pq=directory(f"{OUTPUT_BASEPATH}/significant_genes.parquet"),
         touch_file=touch(f"{OUTPUT_BASEPATH}/done"),
     input: unpack(_compare_associations_input_fn)
     params:

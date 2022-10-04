@@ -53,6 +53,37 @@ hdl_cholesterol=expand(
     covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS"],
 )
 
+hdl_cholesterol_term_pvals=expand(
+    rules.associate__compare_params.output,
+    phenotype_col="hdl_cholesterol_f30760_0_0", 
+    feature_set=["AbExp_all_tissues",],
+    covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS"],
+)
+
+all_phenotypes = [
+    "hdl_cholesterol_f30760_0_0",
+    "ldl_direct_f30780_0_0",
+    # "c_reactive_protein_f30710_0_0",
+    "triglycerides_f30870_0_0",
+    "standing_height_f50_0_0",
+    "body_mass_index_bmi_f21001_0_0",
+    "systolic_blood_pressure_automated_reading_f4080_0_0",
+]
+all_phenotypes_output = [
+    *expand(
+        rules.associate__compare_genebass.output,
+        phenotype_col=all_phenotypes,
+        feature_set=["LOFTEE_pLoF", "AbExp_all_tissues", "max_AbExp", "median_AbExp"],
+        covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS"],
+    ),
+    *expand(
+        rules.associate__compare_params.output,
+        phenotype_col=all_phenotypes,
+        feature_set=["AbExp_all_tissues",],
+        covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS"],
+    ),
+]
+
 rule all:
     input:
         expand(rules.read_phenotypes.output, zip, pheno_dir=phenotype_dirs, ukbb_code=ukbb_codes),
@@ -61,6 +92,8 @@ rule all:
 #         rules.Index.output, 
 #         expand('/s/project/bayesRare/UKBB_Splicing_Analysis/results/{phenocode}/boxplot.png', phenocode = set(associations.phenocode))
         *hdl_cholesterol,
+        *hdl_cholesterol_term_pvals,
+        *all_phenotypes_output,
         expand(rules.compare_associations.output, comparison=["all"]),
 
 

@@ -39,6 +39,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 # %%
+from rep.notebook_init import setup_plot_style
+setup_plot_style()
+
+# %%
 # %matplotlib inline
 # %config InlineBackend.figure_format='retina'
 
@@ -75,7 +79,7 @@ except NameError:
             "phenotype_col": "hdl_cholesterol_f30760_0_0",
             # "feature_set": "LOFTEE_pLoF",
             "feature_set": "AbExp_all_tissues",
-            "covariates": "sex_age_genPC",
+            "covariates": "sex_age_genPC_CLMP_PRS",
         }
     )
 
@@ -105,13 +109,6 @@ phenotype_col
 # %%
 phenocode = config["covariates"]["phenocode"]
 phenocode
-
-# %% [markdown]
-# ## read protein-coding genes
-
-# %%
-protein_coding_genes_df = spark.read.parquet(snakemake.input["protein_coding_genes_pq"])
-protein_coding_genes_df.limit(10).toPandas()
 
 # %% [markdown] {"tags": []}
 # ## read association results
@@ -143,16 +140,15 @@ regression_results_df = (
 regression_results_df.printSchema()
 
 # %%
-
-f.udf(
-
-# %%
 from urllib.parse import unquote
 
 spark_unquote = f.udf(unquote, t.StringType())
 
+# %% [markdown]
+# ## term pvals
+
 # %%
-regression_params_df = (
+regression_term_pval_df = (
     regression_results_df
     .select(
         "*",
@@ -166,31 +162,61 @@ regression_params_df = (
         "params",
     )
 )
-regression_params_df.printSchema()
+regression_term_pval_df.printSchema()
 
 # %%
-terms = regression_params_df.select("term").distinct().toPandas()["term"].sort_values()
-terms
+regression_term_pval_pd_df = regression_term_pval_df.toPandas()
+regression_term_pval_pd_df
+
+# %% [markdown]
+# ## params
+
+# %%
+regression_params_df = (
+    regression_results_df
+    .select(
+        "*",
+        f.explode(f.col("params")).alias("term", "param")
+    )
+    .withColumn("term", spark_unquote(f.regexp_extract(f.col("term"), r'''(Q\(['"])?([^"']*)''', 2)))
+    .filter(f.col("term").contains("AbExp"))
+    .withColumn("term", f.regexp_replace(f.col("term"), r'''AbExp@AbExp_''', ""))
+    .drop(
+        "term_pvals",
+        "params",
+    )
+)
+regression_params_df.printSchema()
 
 # %%
 regression_params_pd_df = regression_params_df.toPandas()
 regression_params_pd_df
 
-# %%
+# %% [markdown]
+# ## number of samples per tissue
 
 # %%
+num_samples_per_tissue_df = pd.read_parquet(snakemake.input["num_samples_per_tissue"])
+num_samples_per_tissue_df
 
 # %% [markdown]
-# ## Plot
+# # Plot
 
 # %% [markdown]
-# ## full plot
+# ## term pvals
 
 # %%
-plot_df = regression_params_pd_df
+plot_df = regression_term_pval_pd_df
 plot_df = (
     plot_df
-    .assign(minus_log10_pval=-np.log10(plot_df["term_pval"].values))
+    .merge(num_samples_per_tissue_df.rename(columns={"subtissue": "term"}), on="term", how="left")
+    .assign(minus_log10_pval=np.fmin(-np.log10(plot_df["term_pval"].values), 25))
+    .fillna({
+        "lr_pval": 1,
+        "padj": 1,
+        "term_pval": 1.,
+        "minus_log10_pval": 0,
+    })
     .query("padj < 0.05")
 )
 plot_df
@@ -204,15 +230,22 @@ plot = (
     pn.ggplot(plot_df, pn.aes(
         x="term",
         y="minus_log10_pval",
+        # fill="num_samples",
     ))
-    + pn.geom_boxplot()
-    + pn.theme(axis_text_x=pn.element_text(rotation=90))
+    + pn.geom_boxplot(
+        fill="lightgray"
+    )
+    # + pn.geom_violin()
+    # + pn.theme(axis_text_x=pn.element_text(rotation=90))
     + pn.scale_x_discrete(limits=box_order.index)
     + pn.labs(
         title=f"Distribution of term p-values for significantly associating genes\n(trait: '{phenotype_col}')",
         #x="",
         y="-log10(p-value)",
     )
+    # + pn.guides(fill=pn.guide_legend(label_vjust=-1))
+    + pn.theme(figure_size=(8, 8))
+    + pn.coord_flip()
 )
 
 # %%
@@ -220,6 +253,90 @@ display(plot)
 
 # %%
 path = snakemake.params["output_basedir"] + "/term_pvalue_boxplot"
+pn.ggsave(plot, path + ".png", dpi=DPI)
+pn.ggsave(plot, path + ".pdf", dpi=DPI)
+
+# %%
+plot = (
+    pn.ggplot(plot_df, pn.aes(
+        x="term",
+        y="minus_log10_pval",
+        fill="num_samples",
+    ))
+    + pn.geom_boxplot(
+        # fill="lightgray"
+    )
+    # + pn.geom_violin()
+    # + pn.theme(axis_text_x=pn.element_text(rotation=90))
+    + pn.scale_x_discrete(limits=box_order.index)
+    + pn.labs(
+        title=f"Distribution of term p-values for significantly associating genes\n(trait: '{phenotype_col}')",
+        #x="",
+        y="-log10(p-value)",
+    )
+    + pn.scale_fill_cmap(
+        "Reds",
+        limits=(0, 1000),
+        name="Nr. of GTEx samples"
+    )
+    # + pn.guides(fill=pn.guide_legend(label_vjust=-1))
+    + pn.theme(figure_size=(8, 8))
+    + pn.coord_flip()
+)
+
+# %%
+display(plot)
+
+# %%
+path = snakemake.params["output_basedir"] + "/term_pvalue_boxplot_colored"
+pn.ggsave(plot, path + ".png", dpi=DPI)
+pn.ggsave(plot, path + ".pdf", dpi=DPI)
+
+# %% [markdown]
+# ## params
+
+# %%
+plot_df = regression_params_pd_df
+plot_df = (
+    plot_df
+    .fillna({
+        "lr_pval": 1,
+        "padj": 1,
+        "param": 0.,
+    })
+    .query("padj < 0.05")
+)
+plot_df
+
+# %%
+box_order = plot_df.groupby("term")["param"].median().sort_values()
+box_order
+
+# %%
+plot = (
+    pn.ggplot(plot_df, pn.aes(
+        x="term",
+        y="param",
+    ))
+    + pn.geom_boxplot(
+        fill="lightgray"
+    )
+    # + pn.geom_violin()
+    + pn.theme(axis_text_x=pn.element_text(rotation=90))
+    + pn.scale_x_discrete(limits=box_order.index)
+    + pn.labs(
+        title=f"Distribution of term parameters for significantly associating genes\n(trait: '{phenotype_col}')",
+        #x="",
+        #y="-log10(p-value)",
+    )
+    + pn.scale_y_log10()
+)
+
+# %%
+display(plot)
+
+# %%
+path = snakemake.params["output_basedir"] + "/term_param_boxplot"
 pn.ggsave(plot, path + ".png", dpi=DPI)
 pn.ggsave(plot, path + ".pdf", dpi=DPI)
 

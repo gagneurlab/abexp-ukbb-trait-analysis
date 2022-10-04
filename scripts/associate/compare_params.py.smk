@@ -18,6 +18,7 @@ rule associate__compare_params:
         associations_pq=f"{OUTPUT_BASEPATH}/associations.parquet",
         featureset_config=f"{OUTPUT_BASEPATH}/config.yaml",
         regression_done=f"{OUTPUT_BASEPATH}/done",
+        num_samples_per_tissue=config["num_samples_per_tissue"]
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
         output_basedir=OUTPUT_BASEPATH,

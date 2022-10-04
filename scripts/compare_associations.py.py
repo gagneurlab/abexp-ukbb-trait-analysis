@@ -40,6 +40,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 # %%
+from rep.notebook_init import setup_plot_style
+setup_plot_style()
+
+# %%
 # %matplotlib inline
 # %config InlineBackend.figure_format='retina'
 
