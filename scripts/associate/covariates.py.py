@@ -55,8 +55,8 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'covariates',
         default_wildcards={
-            # "phenotype_col": "hdl_cholesterol_f30760_0_0",
-            "phenotype_col": "systolic_blood_pressure_f4080_0_0",
+            "phenotype_col": "hdl_cholesterol_f30760_0_0",
+            # "phenotype_col": "systolic_blood_pressure_f4080_0_0",
             "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex+age+genPC+CLMP",
             # "covariates": "sex_age_genPC",
@@ -118,6 +118,10 @@ config["clumping_gene_padding"]
 # %%
 config["add_PRS"] = config.get("add_PRS", False)
 config["add_PRS"]
+
+# %%
+config["randomize_phenotype"] = config.get("randomize_phenotype", False)
+config["randomize_phenotype"]
 
 # %%
 phenotype_col = snakemake.wildcards["phenotype_col"]
@@ -259,6 +263,11 @@ data_df = data_df.rename({"eid": "individual"})
 # %%
 # make sure that sample_id is a string
 data_df = data_df.with_column(pl.col("individual").cast(pl.Utf8).alias("individual"))
+
+# %%
+# shuffle phenotype column if requested
+if config["randomize_phenotype"]:
+    data_df = data_df.with_column(pl.col(phenotype_col).shuffle(seed=42))
 
 # %%
 # change order of columns
