@@ -66,9 +66,11 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__compare_genebass',
         default_wildcards={
-            "phenotype_col": "hdl_cholesterol_f30760_0_0",
-            "feature_set": "LOFTEE_pLoF",
-            "covariates": "sex+age+genPC",
+            "phenotype_col": "triglycerides_f30870_0_0",
+            #"phenotype_col": "hdl_cholesterol_f30760_0_0",
+            #"feature_set": "LOFTEE_pLoF",
+            "feature_set": "AbExp_all_tissues",
+            "covariates": "sex_age_genPC",
         }
     )
 
@@ -220,7 +222,16 @@ x="Genebass"
 y=snakemake.wildcards["feature_set"]
 
 cutoff = 0.05
-crop_pvalue = 10 ** -10
+crop_pvalue = 10 ** -150
+
+plot_df = (
+    plot_df
+    .assign(**{
+        x: np.fmax(crop_pvalue, plot_df[x].fillna(1)),
+        y: np.fmax(crop_pvalue, plot_df[y].fillna(1)),
+    })
+    #.loc[(combined_regression_results_df[x] < cutoff) | (combined_regression_results_df[y] < cutoff), [x, y]]
+)
 
 counts_x = (plot_df[x] < cutoff).sum()
 counts_y = (plot_df[y] < cutoff).sum()
@@ -231,7 +242,7 @@ min_pval = min(
 )
 
 plot = (
-    pn.ggplot(plot_df.fillna(1), pn.aes(x=x, y=y))
+    pn.ggplot(plot_df, pn.aes(x=x, y=y))
     + pn.geom_abline(slope=1, color="black", linetype="dashed")
     + pn.geom_hline(yintercept=0.05, color="red", linetype="dashed")
     + pn.geom_vline(xintercept=0.05, color="red", linetype="dashed")
