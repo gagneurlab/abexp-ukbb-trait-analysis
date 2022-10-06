@@ -8,6 +8,7 @@ include: f"{SNAKEFILE_DIR}/covariates.py.smk"
 include: f"{SNAKEFILE_DIR}/regression.py.smk"
 include: f"{SNAKEFILE_DIR}/compare_genebass.py.smk"
 include: f"{SNAKEFILE_DIR}/compare_params.py.smk"
+include: f"{SNAKEFILE_DIR}/polygenic_risk_score.py.smk"
 
 # subdirectories
 smkpaths = [
