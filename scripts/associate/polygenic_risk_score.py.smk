@@ -17,6 +17,15 @@ rule associate__polygenic_risk_score:
         mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
     output:
         prs_features_pq=directory(f"{OUTPUT_BASEPATH}/prs_features.parquet"),
+        predictions_pq=f"{OUTPUT_BASEPATH}/predictions.parquet",
+        # stats_pq=f"{OUTPUT_BASEPATH}/stats.parquet",
+        restricted_summary_txt=f"{OUTPUT_BASEPATH}/restricted_model.summary.txt",
+        full_summary_txt=f"{OUTPUT_BASEPATH}/full_model.summary.txt",
+        restricted_params_pq=f"{OUTPUT_BASEPATH}/restricted_model.params.parquet",
+        full_params_pq=f"{OUTPUT_BASEPATH}/full_model.params.parquet",
+        # pickling not working bc of patsy formula
+        # restricted_model=f"{OUTPUT_BASEPATH}/restricted_model.pickle",
+        # full_model=f"{OUTPUT_BASEPATH}/full_model.pickle",
         touch_file=touch(f"{OUTPUT_BASEPATH}/done"),
     input:
         # protein_coding_genes_pq=config["protein_coding_genes_pq"],

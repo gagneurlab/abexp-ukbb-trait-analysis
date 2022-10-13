@@ -72,6 +72,9 @@ df = (
 )
 df.printSchema()
 
+indivs = df.select("individual").distinct().sort("individual").toPandas()["individual"]
+len(indivs)
+
 # # pivot tissues
 
 subtissues = df.select("subtissue").distinct().sort("subtissue").toPandas()["subtissue"]

@@ -50,6 +50,10 @@ import matplotlib.pyplot as plt
 # %config InlineBackend.figure_format='retina'
 
 # %%
+from rep.notebook_init import setup_plot_style
+setup_plot_style()
+
+# %%
 # import os
 # # os.environ["RAY_ADDRESS"] = os.environ.get("RAY_ADDRESS", 'ray://192.168.16.30:10001')
 # os.environ["RAY_ADDRESS"] = 'ray://192.168.16.28:10001'
@@ -97,7 +101,7 @@ snakefile_path = os.getcwd() + "/../../Snakefile"
 snakefile_path
 
 # %%
-#del snakemake
+# del snakemake
 
 # %%
 try:
@@ -125,6 +129,12 @@ except NameError:
 
 # %%
 print(json.dumps(snakemake.__dict__, indent=2, default=str))
+
+# %%
+if "plot_dpi" in snakemake.params:
+    DPI = snakemake.params["plot_dpi"]
+else:
+    DPI=450
 
 # %% [markdown] {"tags": []}
 # # Load configuration
@@ -313,7 +323,11 @@ gene_features = [f"{g}_{s}" for g, s in itertools.product(significant_genes, fea
 # ### join everything
 
 # %% {"tags": []}
-full_features_df = covariates_df.join(pivot_features_df, on="individual", how="left")
+full_features_df = (
+    covariates_df
+    .join(pivot_features_df, on="individual", how="left")
+    .fillna(0, subset=pivot_features_df.columns)
+)
 full_features_df.printSchema()
 
 
@@ -410,34 +424,19 @@ prs_features_df.write.parquet(snakemake.output["prs_features_pq"], mode="overwri
 # %%
 prs_features_df = spark.read.parquet(snakemake.output["prs_features_pq"])
 
-# %% [raw]
-# prs_features_pd_df = prs_features_df.toPandas()
+# %%
+prs_features_pd_df = prs_features_df.toPandas()
 
-# %% [raw]
-# prs_features_pd_df.head()
+# %%
+spark.sparkContext._jvm.System.gc()
+
+# %%
+prs_features_pd_df.head()
 
 # %%
 
 # %% [markdown]
 # # perform regression
-
-# %%
-import pyarrow as pa
-import pyarrow.parquet as pq
-import statsmodels.formula.api as smf
-
-class DataSet(dict):
-    def __init__(self, path):
-        self.parquet = pq.ParquetDataset(path)
-
-    def __getitem__(self, key):
-        try:
-            return self.parquet.read([key]).to_pandas()[key]
-        except:
-            raise KeyError
-
-prs_features_lazydict = DataSet(snakemake.output["prs_features_pq"])
-
 
 # %% {"tags": []}
 import statsmodels.formula.api as smf
@@ -445,7 +444,7 @@ import statsmodels.formula.api as smf
 # %%
 restricted_model = smf.ols(
     formatted_restricted_formula,
-    data = prs_features_lazydict
+    data = prs_features_pd_df
 ).fit()
 
 # %%
@@ -455,13 +454,183 @@ full_model = smf.ols(
 ).fit()
 
 # %%
+lr_stat, lr_pval, lr_df_diff = full_model.compare_lr_test(restricted_model)
 
 # %%
+lr_pval
 
 # %%
-assert _test.iloc[0]["lr_df_diff"] == 0
-display(_test)
-del _test
+lr_df_diff
 
 # %%
+prs_features_pd_df.dropna().shape
 
+# %%
+prs_features_pd_df.shape
+
+# %%
+pred_df = (
+    prs_features_pd_df[["individual", phenotype_col]]
+    .rename(columns={phenotype_col: "measurement"})
+    .assign(**{
+        "phenotype_col": phenotype_col,
+        "full_model_pred": full_model.predict(prs_features_pd_df),
+        "restricted_model_pred": restricted_model.predict(prs_features_pd_df),
+    })
+)
+pred_df
+
+# %%
+pred_df = (
+    pred_df
+    .assign(**{
+        "residuals": pred_df["measurement"] - pred_df["restricted_model_pred"],
+        "full - restricted": pred_df["full_model_pred"] - pred_df["restricted_model_pred"],
+        
+    })
+)
+pred_df
+
+# %%
+restricted_model.rsquared
+
+# %%
+full_model.rsquared
+
+# %% [markdown]
+# # save model + predictions
+
+# %%
+snakemake.output
+
+# %% [markdown]
+# ## predictions
+
+# %%
+pred_df.to_parquet(snakemake.output["predictions_pq"], index=False)
+
+# %% [markdown]
+# ## summary
+
+# %%
+restricted_model_summary = restricted_model.summary2()
+full_model_summary = full_model.summary2()
+
+# %%
+with open(snakemake.output["restricted_summary_txt"], "w") as fd:
+    fd.write(restricted_model_summary.as_text())
+    fd.write("\n")
+
+# %%
+with open(snakemake.output["full_summary_txt"], "w") as fd:
+    fd.write(full_model_summary.as_text())
+    fd.write("\n")
+
+# %% [markdown]
+# ## params
+
+# %%
+restricted_params_df = (
+    restricted_model_summary.tables[1]
+    .rename_axis(index="term")
+    .reset_index()
+)
+restricted_params_df
+
+# %%
+restricted_params_df.to_parquet(snakemake.output["restricted_params_pq"], index=False)
+
+# %%
+full_params_df = (
+    full_model_summary.tables[1]
+    .rename_axis(index="term")
+    .reset_index()
+)
+full_params_df
+
+# %%
+full_params_df.to_parquet(snakemake.output["full_params_pq"], index=False)
+
+# %% [markdown]
+# # plotting
+
+# %% [markdown]
+# ## phenotype correlation
+
+# %%
+plot_df = pred_df[["phenotype_col", "measurement", "full_model_pred", "restricted_model_pred"]]
+plot_df = plot_df.melt(id_vars=["phenotype_col", "measurement"])
+
+plot = (
+    pn.ggplot(plot_df, pn.aes(y="measurement", x="value"))
+    + pn.geom_bin_2d(bins=100)
+    + pn.geom_smooth(method="lm", color="red")
+    + pn.facet_grid("phenotype_col ~ variable")
+    + pn.scale_fill_continuous(trans = "log10")
+    + pn.coord_equal()
+    + pn.labs(
+        x="prediction",
+    )
+)
+display(plot)
+
+# %%
+snakemake.params["output_basedir"]
+
+# %%
+path = snakemake.params["output_basedir"] + "/phenotype_correlation"
+pn.ggsave(plot, path + ".png", dpi=DPI)
+pn.ggsave(plot, path + ".pdf", dpi=DPI)
+
+# %% [raw]
+# from IPython.display import Image
+# display(Image(snakemake.params["output_basedir"] + "/phenotype_correlation.png"))
+
+# %% [markdown]
+# ## residual correlation
+
+# %%
+snakemake.wildcards
+
+# %%
+import sklearn.metrics as skmetrics
+import textwrap
+
+plot_r2 = skmetrics.r2_score(pred_df["residuals"], pred_df["full - restricted"])
+
+plot = (
+    pn.ggplot(pred_df, pn.aes(y="residuals", x="full - restricted"))
+    + pn.geom_bin_2d(bins=100)
+    + pn.geom_smooth(method="lm", color="red")
+    + pn.scale_fill_continuous(trans = "log10")
+    + pn.labs(
+        x="prediction\n(full model - restricted model)",
+        y=f"residuals\n(phenotype - restricted model)",
+        title=textwrap.dedent(
+            f"""
+            Polygenic score predicting '{phenotype_col}'
+            Covariates: '{snakemake.wildcards['covariates'].replace('_', '+')}'
+            r2: '{"%.4f" % plot_r2}'
+            (Every point represents one individual)\
+            """
+        ).strip(),
+        fill='Nr. of individuals'
+    )
+    + pn.theme(title=pn.element_text(linespacing=1.4))
+    + pn.coord_equal()
+)
+
+# %%
+if len(restricted_variables) != len(full_variables):
+    display(plot)
+
+# %%
+snakemake.params["output_basedir"]
+
+# %%
+path = snakemake.params["output_basedir"] + "/residual_correlation"
+if len(restricted_variables) != len(full_variables):
+    pn.ggsave(plot, path + ".png", dpi=DPI)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI)
+
+# %%

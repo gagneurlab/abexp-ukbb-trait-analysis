@@ -82,6 +82,12 @@ all_phenotypes_output = [
         feature_set=["AbExp_all_tissues",],
         covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS"],
     ),
+    *expand(
+        rules.associate__polygenic_risk_score.output,
+        phenotype_col=all_phenotypes,
+        feature_set=["LOFTEE_pLoF", "AbExp_all_tissues", "max_AbExp", "median_AbExp"],
+        covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS"],
+    )
 ]
 
 rule all:

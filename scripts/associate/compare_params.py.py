@@ -77,9 +77,11 @@ except NameError:
         rule_name = 'associate__compare_params',
         default_wildcards={
             "phenotype_col": "hdl_cholesterol_f30760_0_0",
+            # "phenotype_col": "systolic_blood_pressure_automated_reading_f4080_0_0",
             # "feature_set": "LOFTEE_pLoF",
             "feature_set": "AbExp_all_tissues",
-            "covariates": "sex_age_genPC_CLMP_PRS",
+            # "covariates": "sex_age_genPC_CLMP_PRS",
+            "covariates": "sex_age_genPC_CLMP",
         }
     )
 
@@ -244,17 +246,22 @@ plot = (
         y="-log10(p-value)",
     )
     # + pn.guides(fill=pn.guide_legend(label_vjust=-1))
-    + pn.theme(figure_size=(8, 8))
+    + pn.theme(
+        figure_size=(8, 8),
+        title=pn.element_text(linespacing=1.5)
+    )
     + pn.coord_flip()
 )
 
 # %%
-display(plot)
+if not plot_df.empty:
+    display(plot)
 
 # %%
-path = snakemake.params["output_basedir"] + "/term_pvalue_boxplot"
-pn.ggsave(plot, path + ".png", dpi=DPI)
-pn.ggsave(plot, path + ".pdf", dpi=DPI)
+if not plot_df.empty:
+    path = snakemake.params["output_basedir"] + "/term_pvalue_boxplot"
+    pn.ggsave(plot, path + ".png", dpi=DPI)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI)
 
 # %%
 plot = (
@@ -280,17 +287,22 @@ plot = (
         name="Nr. of GTEx samples"
     )
     # + pn.guides(fill=pn.guide_legend(label_vjust=-1))
-    + pn.theme(figure_size=(8, 8))
+    + pn.theme(
+        figure_size=(8, 8),
+        title=pn.element_text(linespacing=1.5)
+    )
     + pn.coord_flip()
 )
 
 # %%
-display(plot)
+if not plot_df.empty:
+    display(plot)
 
 # %%
-path = snakemake.params["output_basedir"] + "/term_pvalue_boxplot_colored"
-pn.ggsave(plot, path + ".png", dpi=DPI)
-pn.ggsave(plot, path + ".pdf", dpi=DPI)
+if not plot_df.empty:
+    path = snakemake.params["output_basedir"] + "/term_pvalue_boxplot_colored"
+    pn.ggsave(plot, path + ".png", dpi=DPI)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI)
 
 # %% [markdown]
 # ## params
@@ -322,7 +334,11 @@ plot = (
         fill="lightgray"
     )
     # + pn.geom_violin()
-    + pn.theme(axis_text_x=pn.element_text(rotation=90))
+    + pn.theme(
+        # axis_text_x=pn.element_text(rotation=90),
+        figure_size=(8, 8),
+        title=pn.element_text(linespacing=1.5),
+    )
     + pn.scale_x_discrete(limits=box_order.index)
     + pn.labs(
         title=f"Distribution of term parameters for significantly associating genes\n(trait: '{phenotype_col}')",
@@ -330,15 +346,18 @@ plot = (
         #y="-log10(p-value)",
     )
     + pn.scale_y_log10()
+    + pn.coord_flip()
 )
 
 # %%
-display(plot)
+if not plot_df.empty:
+    display(plot)
 
 # %%
-path = snakemake.params["output_basedir"] + "/term_param_boxplot"
-pn.ggsave(plot, path + ".png", dpi=DPI)
-pn.ggsave(plot, path + ".pdf", dpi=DPI)
+if not plot_df.empty:
+    path = snakemake.params["output_basedir"] + "/term_param_boxplot"
+    pn.ggsave(plot, path + ".png", dpi=DPI)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI)
 
 # %%
 

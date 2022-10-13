@@ -44,6 +44,9 @@ setup_plot_style()
 # %config InlineBackend.figure_format='retina'
 
 # %%
+import matplotlib_venn
+
+# %%
 # import os
 # # os.environ["RAY_ADDRESS"] = os.environ.get("RAY_ADDRESS", 'ray://192.168.16.30:10001')
 # os.environ["RAY_ADDRESS"] = 'ray://192.168.16.28:10001'
@@ -70,7 +73,8 @@ except NameError:
             #"phenotype_col": "hdl_cholesterol_f30760_0_0",
             #"feature_set": "LOFTEE_pLoF",
             "feature_set": "AbExp_all_tissues",
-            "covariates": "sex_age_genPC",
+            # "covariates": "sex_age_genPC",
+            "covariates": "sex_age_genPC_CLMP_PRS",
         }
     )
 
@@ -263,6 +267,11 @@ plot = (
         x=f"{x}\n(n_signif={counts_x})",
         y=f"{y}\n(n_signif={counts_y})",
     )
+    + pn.theme(
+        # axis_text_x=pn.element_text(rotation=90),
+        # figure_size=(8, 8),
+        title=pn.element_text(linespacing=1.4),
+    )
     # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
 )
 
@@ -325,6 +334,11 @@ plot = (
         x=f"{x}\n(n_signif={counts_x})",
         y=f"{y}\n(n_signif={counts_y})",
     )
+    + pn.theme(
+        # axis_text_x=pn.element_text(rotation=90),
+        # figure_size=(8, 8),
+        title=pn.element_text(linespacing=1.4),
+    )
     # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
 )
 
@@ -335,6 +349,35 @@ display(plot)
 path = snakemake.params["output_basedir"] + "/pvalue_comp_cropped"
 pn.ggsave(plot, path + ".png", dpi=DPI)
 pn.ggsave(plot, path + ".pdf", dpi=DPI)
+
+# %% [markdown]
+# ## Venn diagram
+
+# %%
+
+# %%
+fig, ax = plt.subplots()
+matplotlib_venn.venn2(
+    (
+        set(combined_regression_results_df[combined_regression_results_df[x] < cutoff].index.get_level_values("gene")),
+        set(combined_regression_results_df[combined_regression_results_df[y] < cutoff].index.get_level_values("gene")),
+    ),
+    set_labels = (x, y),
+    ax=ax
+)
+display(ax)
+
+# %%
+snakemake.params["output_basedir"] + "/genebass_overlap"
+
+# %%
+path = snakemake.params["output_basedir"] + "/genebass_overlap"
+fig.savefig(path + ".png", dpi=DPI)
+fig.savefig(path + ".pdf", dpi=DPI)
+
+# %% [raw]
+# from IPython.display import Image
+# display(Image(snakemake.params["output_basedir"] + "/genebass_overlap.png"))
 
 # %% [markdown]
 # # save stats

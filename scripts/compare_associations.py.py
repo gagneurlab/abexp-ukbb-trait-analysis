@@ -40,6 +40,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 # %%
+import textwrap
+
+# %%
 from rep.notebook_init import setup_plot_style
 setup_plot_style()
 
@@ -249,10 +252,26 @@ plot_df = adj_regression_results_pd_df.fillna({
     "rsquared_diff": 0.,
 })
 
-plot_df = plot_df.assign(covariates=plot_df["covariates"].str.replace("_", "\n+ "))
+plot_df = plot_df.assign(
+    covariates=plot_df["covariates"].str.replace("_", "\n+ "),
+    phenotype_col=(
+        plot_df["phenotype_col"]
+        .str.replace(r"_(f\d+_.*)", r"\n(\1)", regex=True)
+        .str.split("\n")
+        # .str.replace(r"_", r" ", regex=True)
+        .apply(
+            lambda s: "\n".join([
+                textwrap.fill(s[0].replace("_", " "), 12, break_long_words=False),
+                *s[1:]
+            ])
+        )
+        .astype("string[pyarrow]")
+    ),
+)
 
 # crop_pvalue = 10 ** -10
 
+# %%
 plot = (
     pn.ggplot(plot_df, pn.aes(x="feature_set", y="rsquared_diff"))
     # + pn.geom_abline(slope=1, color="black", linetype="dashed")
@@ -284,11 +303,21 @@ plot = (
         y=f"r²(full) - r²(restricted)",
     )
     # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
-    + pn.theme(axis_text_x=pn.element_text(
-        rotation=90,
-        # hjust=1
-    ))
-    + pn.facet_grid("phenotype_col ~ covariates")
+    + pn.theme(
+        figure_size=(8, 8),
+        axis_text_x=pn.element_text(
+            rotation=45,
+            hjust=1
+        ),
+        strip_text_y=pn.element_text(
+            rotation=0,
+        ),
+        title=pn.element_text(linespacing=1.4),
+    )
+    + pn.facet_grid(
+        "phenotype_col ~ covariates",
+        scales="fixed"
+    )
     # + pn.coord_flip()
 )
 
@@ -302,6 +331,11 @@ snakemake.params["output_basedir"]
 path = snakemake.params["output_basedir"] + "/rsquared_diff"
 pn.ggsave(plot, path + ".png", dpi=DPI)
 pn.ggsave(plot, path + ".pdf", dpi=DPI)
+
+# %%
+path = snakemake.params["output_basedir"] + "/rsquared_diff.free_y"
+pn.ggsave(plot + pn.facet_grid("phenotype_col ~ covariates", scales="free_y"), path + ".png", dpi=DPI)
+pn.ggsave(plot + pn.facet_grid("phenotype_col ~ covariates", scales="free_y"), path + ".pdf", dpi=DPI)
 
 # %% [markdown]
 # ## scatter plot r²-diff
@@ -355,10 +389,13 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
             y=f"{feature_y}\n(r²(full) - r²(restricted))",
         )
         + pn.facet_grid("phenotype_col ~ covariates")
-        + pn.theme(axis_text_x=pn.element_text(
-            rotation=30,
-            # hjust=1
-        ))
+        + pn.theme(
+            axis_text_x=pn.element_text(
+                rotation=30,
+                # hjust=1
+            ),
+            title=pn.element_text(linespacing=1.4),
+        )
     )
 
     
@@ -473,10 +510,13 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
         )
         + pn.ggtitle(f"Comparison between '{feature_x}' and '{feature_y}'\n(p-values, alpha={pval_cutoff})")
         + pn.facet_grid("phenotype_col ~ covariates")
-        + pn.theme(axis_text_x=pn.element_text(
-            rotation=30,
-            # hjust=1
-        ))
+        + pn.theme(
+            axis_text_x=pn.element_text(
+                rotation=30,
+                # hjust=1
+            ),
+            title=pn.element_text(linespacing=1.4),
+        )
     )
     
     path = snakemake.params["output_basedir"] + f"/feature_comp.padj@{feature_x}__vs__{feature_y}"
@@ -537,10 +577,13 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
         )
         + pn.ggtitle(f"Comparison between '{feature_x}' and '{feature_y}'\n(p-values, alpha={pval_cutoff})")
         + pn.facet_grid("phenotype_col ~ covariates")
-        + pn.theme(axis_text_x=pn.element_text(
-            rotation=30,
-            # hjust=1
-        ))
+        + pn.theme(
+            axis_text_x=pn.element_text(
+                rotation=30,
+                # hjust=1
+            ),
+            title=pn.element_text(linespacing=1.4),
+        )
     )
     
     path = snakemake.params["output_basedir"] + f"/feature_comp.padj_cropped@{feature_x}__vs__{feature_y}"
