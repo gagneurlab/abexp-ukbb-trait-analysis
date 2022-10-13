@@ -230,6 +230,12 @@ num_significant_associations = (
         f.sum(f.col("is_significant").cast(t.IntegerType())).alias("num_significant"),
         f.count(f.col("is_significant")).alias("total_association_tests"),
     )
+    .sort(
+        "phenotype_col",
+        "num_significant",
+        "covariates",
+        "feature_set",
+    )
     .toPandas()
 )
 num_significant_associations
@@ -241,6 +247,73 @@ num_significant_associations.to_parquet(f"{path}.parquet", index=False)
 
 # %% [markdown]
 # ## Plot
+
+# %% [markdown]
+# ## barplot num. significants
+
+# %%
+plot_df = num_significant_associations
+plot_df = plot_df.assign(
+    covariates=plot_df["covariates"].str.replace("_", "\n+ "),
+    phenotype_col=(
+        plot_df["phenotype_col"]
+        .str.replace(r"_(f\d+_.*)", r"\n(\1)", regex=True)
+        .str.split("\n")
+        # .str.replace(r"_", r" ", regex=True)
+        .apply(
+            lambda s: "\n".join([
+                textwrap.fill(s[0].replace("_", " "), 12, break_long_words=False),
+                *s[1:]
+            ])
+        )
+        .astype("string[pyarrow]")
+    ),
+)
+
+# crop_pvalue = 10 ** -10
+
+# %%
+plot_df
+
+# %%
+plot = (
+    pn.ggplot(plot_df, pn.aes(x="feature_set", y="num_significant"))
+    + pn.geom_bar(stat="identity")
+    + pn.labs(
+        # title=f"Number of ",
+        # f"\n(p-values, alpha={cutoff})",
+        x=f"feature set",
+        y=f"Nr. of significantly associating genes\n",
+    )
+    # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
+    + pn.theme(
+        figure_size=(8, 8),
+        axis_text_x=pn.element_text(
+            rotation=45,
+            hjust=1
+        ),
+        strip_text_y=pn.element_text(
+            rotation=0,
+        ),
+        title=pn.element_text(linespacing=1.4),
+    )
+    + pn.facet_grid(
+        "phenotype_col ~ covariates",
+        scales="free_y"
+    )
+    # + pn.coord_flip()
+)
+
+# %%
+display(plot)
+
+# %%
+snakemake.params["output_basedir"]
+
+# %%
+path = snakemake.params["output_basedir"] + "/num_significants"
+pn.ggsave(plot, path + ".png", dpi=DPI)
+pn.ggsave(plot, path + ".pdf", dpi=DPI)
 
 # %% [markdown]
 # ## boxplot
