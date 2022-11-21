@@ -60,13 +60,20 @@ hdl_cholesterol_term_pvals=expand(
 )
 
 all_phenotypes = [
-    "hdl_cholesterol_f30760_0_0",
-    "ldl_direct_f30780_0_0",
-    # "c_reactive_protein_f30710_0_0",
-    "triglycerides_f30870_0_0",
-    "standing_height_f50_0_0",
-    "body_mass_index_bmi_f21001_0_0",
-    "systolic_blood_pressure_automated_reading_f4080_0_0",
+    "Asthma",
+    "BodyMassIndex",
+    "CAD_HARD",
+    "CAD_SOFT",
+    # "c_reactive_protein", # missing data
+    "Diabetes",
+    "glycated_haemoglobin_hba1c", # blood sugar -> diabetes risk
+    "HDL_cholesterol",
+    "LDL_direct",
+    "Lipoprotein_A",
+    "severe_LDL",
+    "standing_height",
+    # "systolic_blood_pressure", # bad results
+    "Triglycerides",
 ]
 all_phenotypes_output = [
     *expand(

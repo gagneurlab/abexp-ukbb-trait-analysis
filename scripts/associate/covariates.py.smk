@@ -21,6 +21,7 @@ rule covariates:
         clumping_variants_pq=f"{OUTPUT_BASEPATH}/clumping_variants.parquet",
     input:
         samples_txt=config["samples"],
+        decoded_phenotype_pq=f"{UKBB_DECODED_PHENOTYPES_DIR}/{{phenotype_col}}/data.parquet",
         phenotype_metadata_pq=f"{UKBB_PROCESSED_PHENOTYPES_DIR}/latest.meta.parquet",
         covariates_config=TEMPLATE_FILE,
         # clumping

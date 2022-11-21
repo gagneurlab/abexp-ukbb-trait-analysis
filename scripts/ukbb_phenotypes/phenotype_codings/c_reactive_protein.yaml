@@ -1,0 +1,6 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'c_reactive_protein_f30710_(\d*)_0':

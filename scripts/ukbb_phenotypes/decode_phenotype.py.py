@@ -66,11 +66,11 @@ import pyspark
 import pyspark.sql.types as t
 import pyspark.sql.functions as f
 
-import glow
+# import glow
 
 # %% {"tags": []}
 from rep.notebook_init import init_spark
-spark = init_spark()
+spark = init_spark(enable_glow=False)
 
 # %%
 snakefile_path = os.getcwd() + "/../../Snakefile"
@@ -265,16 +265,11 @@ phenotype_df.printSchema()
 # ## apply expression if existing
 
 # %%
-phenotype_coding["expression"].format(col=snakemake.wildcards["phenotype"])
-
-# %%
-f.expr(phenotype_coding["expression"].format(col=snakemake.wildcards["phenotype"])).alias(snakemake.wildcards["phenotype"])
-
-# %%
-phenotype_df = phenotype_df.withColumn(snakemake.wildcards["phenotype"],
-    f.expr(phenotype_coding["expression"].format(col="`" + snakemake.wildcards["phenotype"] + "`"))
-)
-phenotype_df.printSchema()
+if "expression" in phenotype_coding:
+    phenotype_df = phenotype_df.withColumn(snakemake.wildcards["phenotype"],
+        f.expr(phenotype_coding["expression"].format(col="`" + snakemake.wildcards["phenotype"] + "`"))
+    )
+    phenotype_df.printSchema()
 
 # %%
 snakemake.output
@@ -292,22 +287,6 @@ phenotype_df = spark.read.parquet(snakemake.output["phenotype_pq"])
 # %%
 phenotype_pd_df = phenotype_df.toPandas()
 phenotype_pd_df
-
-# %%
-phenotype_df.
-
-# %%
-pyspark.sql.types.to
-
-# %%
-
-# %%
-pyspark.sql.types.
-
-# %%
-x.dataType.simpleString()
-
-# %%
 
 # %%
 import plotnine as pn

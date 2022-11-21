@@ -66,11 +66,11 @@ import pyspark
 import pyspark.sql.types as t
 import pyspark.sql.functions as f
 
-import glow
+# import glow
 
 # %% {"tags": []}
 from rep.notebook_init import init_spark
-spark = init_spark()
+spark = init_spark(enable_glow=False)
 
 # %%
 snakefile_path = os.getcwd() + "/../../Snakefile"

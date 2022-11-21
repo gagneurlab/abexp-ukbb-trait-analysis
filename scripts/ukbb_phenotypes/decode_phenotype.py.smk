@@ -11,7 +11,7 @@ rule decode_phenotype:
         ntasks=1,
         mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
     output:
-        phenotype_pq=f"{UKBB_DECODED_PHENOTYPES_DIR}/{{phenotype}}/data.parquet",
+        phenotype_pq=directory(f"{UKBB_DECODED_PHENOTYPES_DIR}/{{phenotype}}/data.parquet"),
     input:
         latest_meta_pq=f"{UKBB_PROCESSED_PHENOTYPES_DIR}/latest.meta.parquet",
         phenotype_coding_yaml=f"{SNAKEFILE_DIR}/phenotype_codings/{{phenotype}}.yaml",

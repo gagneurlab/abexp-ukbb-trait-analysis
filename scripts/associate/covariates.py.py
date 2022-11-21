@@ -55,7 +55,7 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'covariates',
         default_wildcards={
-            "phenotype_col": "hdl_cholesterol_f30760_0_0",
+            "phenotype_col": "HDL_cholesterol",
             # "phenotype_col": "systolic_blood_pressure_f4080_0_0",
             "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex+age+genPC+CLMP",
@@ -127,21 +127,8 @@ config["randomize_phenotype"]
 phenotype_col = snakemake.wildcards["phenotype_col"]
 phenotype_col
 
-# %%
-import re
-
-m = re.search('.*_f(.+?)_.*', phenotype_col)
-if m:
-    phenocode = m.group(1)
-else:
-    raise ValueError("Cannot find phenocode!")
-phenocode
-
-# %%
-config["phenocode"] = phenocode
-
 # %% [markdown]
-# ## PRS / Clumping
+# ## PRS / Clumping / phenocode
 
 # %%
 prs_score_mapping = (
@@ -153,6 +140,13 @@ prs_score_mapping
 # %%
 mac_index_variants_path = prs_score_mapping.select("clumping_var_file_path").unique().to_numpy().item()
 mac_index_variants_path
+
+# %%
+phenocode = str(prs_score_mapping.select("genebass_phenocode").unique().to_numpy().item())
+phenocode
+
+# %%
+config["phenocode"] = phenocode
 
 # %% [markdown]
 # ## restricted formula
@@ -201,9 +195,8 @@ covariate_cols
 # %%
 meta_cols = [c for c in covariate_cols if c not in prs_score_mapping["pgs_id"].to_list()]
 phenotype_metadata_subset = phenotype_metadata_df.set_index("col.name").loc[[
-    phenotype_col,
+    # phenotype_col,
     *meta_cols,
-#     *phenotype_column,
 ]]
 phenotype_metadata_subset
 
@@ -234,7 +227,11 @@ samples_df
 # ## phenotypes
 
 # %%
-data_dfs = []
+phenotype_df = pl.scan_parquet(snakemake.input["decoded_phenotype_pq"] + "/*.parquet").sort("eid")
+phenotype_df.schema
+
+# %%
+data_dfs = [phenotype_df]
 for data_path, group_df in phenotype_metadata_subset.groupby("data_path"):
     data_df = (
         pl.scan_parquet(data_path)
@@ -273,6 +270,7 @@ if config["randomize_phenotype"]:
 # change order of columns
 data_df = data_df.select([
     "individual",
+    snakemake.wildcards["phenotype_col"],
     *phenotype_metadata_subset.index
 ])
 
@@ -416,6 +414,9 @@ covariates_df = (
     .collect()
 )
 covariates_df.schema
+
+# %%
+snakemake.output
 
 # %%
 (

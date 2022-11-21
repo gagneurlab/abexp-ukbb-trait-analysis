@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'glycated_haemoglobin_hba1c_f30750_(\d*)_0':
+
+expression: '{col} > 42'
