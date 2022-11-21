@@ -89,7 +89,8 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'decode_phenotype',
         default_wildcards={
-            "phenotype": "Diabetes",
+            "phenotype": "severe_LDL",
+            # "phenotype": "Diabetes",
             # "phenotype": "standing_height",
             # "phenotype": "Asthma",
         }
@@ -161,7 +162,8 @@ if phenotype_coding["type"] == "any":
         matching_colnames = meta_df["col.name"].loc[matching_cols]
 
         for col in matching_colnames:
-            expr = f.coalesce(f.col(col).isin(terms), f.lit(False))
+            # expr = f.coalesce(f.col(col).isin(terms), f.lit(False))
+            expr = f.col(col).isin(terms)
             col_terms.append(expr)
     col_terms
 
@@ -245,6 +247,9 @@ if phenotype_coding["type"] == "sum":
 # %%
 # joined_data_df.select("eid", median_agg(f.array(matching_colnames)), mean_agg(f.array(matching_colnames)), *matching_colnames).toPandas().dropna()
 
+# %% [markdown]
+# ## create dataframe
+
 # %%
 phenotype_expr = phenotype_expr.alias(snakemake.wildcards["phenotype"])
 phenotype_expr
@@ -254,6 +259,21 @@ phenotype_df = joined_data_df.select([
     "eid",
     phenotype_expr,
 ])
+phenotype_df.printSchema()
+
+# %% [markdown]
+# ## apply expression if existing
+
+# %%
+phenotype_coding["expression"].format(col=snakemake.wildcards["phenotype"])
+
+# %%
+f.expr(phenotype_coding["expression"].format(col=snakemake.wildcards["phenotype"])).alias(snakemake.wildcards["phenotype"])
+
+# %%
+phenotype_df = phenotype_df.withColumn(snakemake.wildcards["phenotype"],
+    f.expr(phenotype_coding["expression"].format(col="`" + snakemake.wildcards["phenotype"] + "`"))
+)
 phenotype_df.printSchema()
 
 # %%
@@ -274,16 +294,41 @@ phenotype_pd_df = phenotype_df.toPandas()
 phenotype_pd_df
 
 # %%
+phenotype_df.
+
+# %%
+pyspark.sql.types.to
+
+# %%
+
+# %%
+pyspark.sql.types.
+
+# %%
+x.dataType.simpleString()
+
+# %%
+
+# %%
 import plotnine as pn
 
 # %%
-pheno_dtype = phenotype_pd_df.dtypes[snakemake.wildcards["phenotype"]]
-if pd.api.types.is_bool_dtype(pheno_dtype):
+pheno_dtype = phenotype_df.schema[snakemake.wildcards["phenotype"]].dataType
+pheno_dtype
+
+# %%
+if pheno_dtype == t.BooleanType():
     plot = (
         pn.ggplot(phenotype_pd_df, pn.aes(x=snakemake.wildcards["phenotype"]))
         + pn.geom_bar(stat="count")
     )
-elif pd.api.types.is_numeric_dtype(pheno_dtype):
+elif (
+    pheno_dtype == t.ShortType(),
+    pheno_dtype == t.IntegerType(),
+    pheno_dtype == t.LongType(),
+    pheno_dtype == t.FloatType(),
+    pheno_dtype == t.DoubleType(),
+):
     plot = (
         pn.ggplot(phenotype_pd_df, pn.aes(x=snakemake.wildcards["phenotype"]))
         + pn.geom_histogram()

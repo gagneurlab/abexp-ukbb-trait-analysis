@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'ldl_direct_f30780_(\d*)_0':
+
+expression: '{col} > 4.9'
