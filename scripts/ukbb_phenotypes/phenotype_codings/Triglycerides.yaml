@@ -1,0 +1,6 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'triglycerides_f30870_(\d*)_0':

@@ -1,0 +1,16 @@
+
+type: any
+
+fields:
+  # field.showcase: [list of matching terms]
+  'diagnoses_icd9_f41271_0_(\d*)':
+  - '493'
+  'diagnoses_icd10_f41270_0_(\d*)':
+  - 'J45'
+  - 'J450'
+  - 'J451'
+  - 'J458'
+  - 'J459'
+  - '4930'
+  - '4931'
+  - '4939'

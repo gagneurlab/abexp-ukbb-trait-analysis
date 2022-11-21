@@ -1,0 +1,6 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'body_mass_index_bmi_(\d*)_0':
