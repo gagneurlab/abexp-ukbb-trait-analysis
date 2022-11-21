@@ -31,8 +31,7 @@ CONDA_ENV_YAML_DIR = f"{SNAKEMAKE_DIR}/envs"
 
 UKBB_RAW_PHENOTYPES_DIR = config["ukbb_raw_phenotypes_dir"]
 UKBB_PROCESSED_PHENOTYPES_DIR = config["ukbb_processed_phenotypes_dir"]
-
-
+UKBB_DECODED_PHENOTYPES_DIR = config["ukbb_decoded_phenotypes_dir"]
 
 
 phenotype_dirs, ukbb_codes = glob_wildcards(UKBB_RAW_PHENOTYPES_DIR + "/{phenotype_dir}/{ukbb_code}.tab")

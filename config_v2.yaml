@@ -10,6 +10,7 @@ protein_coding_genes_pq: "/s/project/rep/processed/trait_associations_v2/protein
 
 ukbb_raw_phenotypes_dir: "/s/raw/ukbiobank/phenotypes"
 ukbb_processed_phenotypes_dir: "/s/project/uk_biobank/processed/phenotypes"
+ukbb_decoded_phenotypes_dir: "/s/project/uk_biobank/processed/decoded_phenotypes"
 
 # input
 genebass_results_mt: "/s/project/rep/processed/genebass/results.mt"
