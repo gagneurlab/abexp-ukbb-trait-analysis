@@ -1,12 +1,12 @@
 ---
 phenotypes:
-- "hdl_cholesterol_f30760_0_0"
-- "ldl_direct_f30780_0_0"
+- "HDL_cholesterol"
+- "LDL_direct"
 # - "c_reactive_protein_f30710_0_0"
-- "triglycerides_f30870_0_0"
-- "standing_height_f50_0_0"
-- "body_mass_index_bmi_f21001_0_0"
-- "systolic_blood_pressure_automated_reading_f4080_0_0"
+- "Triglycerides"
+- "standing_height"
+- "BodyMassIndex"
+# - "systolic_blood_pressure"
 
 covariates:
 - "sex_age_genPC"
