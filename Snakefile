@@ -47,14 +47,14 @@ include: 'scripts/__init__.smk'
 
 hdl_cholesterol=expand(
     rules.associate__compare_genebass.output,
-    phenotype_col="hdl_cholesterol_f30760_0_0", 
+    phenotype_col="HDL_cholesterol", 
     feature_set=["LOFTEE_pLoF", "AbExp_all_tissues", "max_AbExp", "median_AbExp"],
     covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS"],
 )
 
 hdl_cholesterol_term_pvals=expand(
     rules.associate__compare_params.output,
-    phenotype_col="hdl_cholesterol_f30760_0_0", 
+    phenotype_col="HDL_cholesterol", 
     feature_set=["AbExp_all_tissues",],
     covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS"],
 )

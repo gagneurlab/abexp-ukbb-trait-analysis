@@ -9,6 +9,7 @@ dependencies:
 - ipykernel
 - pyspark=3.2
 - pandas
+- pyarrow
 - numpy
 - scipy
 - joblib

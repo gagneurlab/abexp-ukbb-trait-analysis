@@ -89,10 +89,10 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'decode_phenotype',
         default_wildcards={
-            "phenotype": "severe_LDL",
+            # "phenotype": "severe_LDL",
             # "phenotype": "Diabetes",
             # "phenotype": "standing_height",
-            # "phenotype": "Asthma",
+            "phenotype": "Asthma",
         }
     )
 
@@ -290,6 +290,8 @@ if "fill_value" in phenotype_coding:
         f.when(
             condition,
             f.lit(phenotype_coding["fill_value"])
+        ).otherwise(
+            f.col(snakemake.wildcards["phenotype"])
         )
     )
     phenotype_df.printSchema()

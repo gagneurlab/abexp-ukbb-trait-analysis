@@ -29,7 +29,7 @@ import pyspark
 import pyspark.sql.types as t
 import pyspark.sql.functions as f
 
-import glow
+# import glow
 
 # %%
 import polars as pl
@@ -81,10 +81,11 @@ if use_ray:
         #     "spark.default.parallelism": int(ray.cluster_resources()["CPU"]),
         #     "spark.sql.shuffle.partitions": 2048,
         # }
+        enable_glow=False,
     )
 else:
     from rep.notebook_init import init_spark
-    spark = init_spark()
+    spark = init_spark(enable_glow=False)
 
 # %%
 ray_context
@@ -109,7 +110,8 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__regression',
         default_wildcards={
-            "phenotype_col": "triglycerides_f30870_0_0",
+            "phenotype_col": "Asthma",
+            # "phenotype_col": "triglycerides_f30870_0_0",
             # "phenotype_col": "standing_height_f50_0_0",
             # "phenotype_col": "body_mass_index_bmi_f21001_0_0",
             # "phenotype_col": "systolic_blood_pressure_automated_reading_f4080_0_0",
@@ -118,8 +120,8 @@ except NameError:
             # "feature_set": "AbExp_all_tissues",
             # "feature_set": "LOFTEE_pLoF",
             # "covariates": "sex_age_genPC_CLMP_PRS",
-            "covariates": "sex_age_genPC_CLMP",
-            # "covariates": "sex_age_genPC",
+            # "covariates": "sex_age_genPC_CLMP",
+            "covariates": "sex_age_genPC",
         }
     )
 
@@ -175,7 +177,10 @@ spark.sparkContext.addFile(snakemake.input["covariates_ipc"])
 # ## clumping
 
 # %%
-clumping_variants_df = pd.read_parquet(snakemake.input["clumping_variants_pq"])
+if config["covariates"]["add_clumping"]:
+    clumping_variants_df = pd.read_parquet(snakemake.input["clumping_variants_pq"])
+else:
+    clumping_variants_df = None
 clumping_variants_df
 
 
@@ -212,28 +217,27 @@ def format_formula(formula, keys, add_clumping=True, clumping_variants_df=clumpi
 
 
 # %%
-test_formula = format_formula(
-    formula=restricted_formula,
-    clumping_variants_df=clumping_variants_df,
-    add_clumping=True,
-    keys={
-        "gene": "ENSG00000160584",
-    }
-)
+# test_formula = format_formula(
+#     formula=restricted_formula,
+#     clumping_variants_df=clumping_variants_df,
+#     add_clumping=True,
+#     keys={
+#         "gene": "ENSG00000160584",
+#     }
+# )
 
 # %%
 # print(test_formula)
 
 # %%
-test_formula_2 = format_formula(
-    formula=restricted_formula,
-    clumping_variants_df=clumping_variants_df,
-    add_clumping=True,
-    keys={
-        "gene": "",
-    }
-)
-
+# test_formula_2 = format_formula(
+#     formula=restricted_formula,
+#     clumping_variants_df=clumping_variants_df,
+#     add_clumping=True,
+#     keys={
+#         "gene": "",
+#     }
+# )
 
 # %%
 # print(test_formula_2)
@@ -309,6 +313,69 @@ broadcast_clumping_variants_df = broadcast(clumping_variants_df)
 
 # %%
 from pyarrow import feather
+import pyarrow as pa
+
+# %%
+data_df = feather.read_table(
+    snakemake.input["covariates_ipc"],
+    use_threads=False,
+    memory_map=True
+)
+
+data_type = data_df.schema[data_df.schema.get_field_index(snakemake.wildcards["phenotype_col"])].type
+data_type
+
+# %%
+is_boolean_dtype = pa.types.is_boolean(data_type)
+if is_boolean_dtype:
+    print("Regression type is boolean!")
+else:
+    print("Regression type is continuous!")
+
+# %%
+from scipy.stats.distributions import chi2
+from statsmodels.discrete.discrete_model import BinaryResultsWrapper
+import statsmodels.api as sm
+
+def likelihood_ratio(ll0, ll1):
+    return -2 * (ll0-ll1)
+
+def lr_test(
+    restricted_model: BinaryResultsWrapper, 
+    full_model: BinaryResultsWrapper
+) -> (float, float, float):
+    """
+    Adopted from:
+    - https://stackoverflow.com/a/70488612/2219819
+    - statsmodels.regression.linear_model.RegressionResults class
+    """
+    
+    df0, df1 = restricted_model.df_model, full_model.df_model
+    df_diff = full_model.df_model - restricted_model.df_model
+    
+    chi2_stat = likelihood_ratio(
+        restricted_model.llf,
+        df_diff,
+    )
+    p = chi2.sf(chi2_stat, df_diff)
+
+    return (
+        chi2_stat,
+        p,
+        df_diff,
+    )
+
+def prsquared_adj(binary_model: BinaryResultsWrapper):
+    """
+    Adopted from statsmodels.regression.linear_model.RegressionResults class:
+    Adjusted pseudo R-squared for binary results.
+    This is defined here as 1 - (`nobs`-1)/`df_resid` * (1-`prsquared`)
+    if a constant is included and 1 - `nobs`/`df_resid` * (1-`prsquared`) if
+    no constant is included.
+    """
+    return 1 - (np.divide(binary_model.nobs - binary_model.k_constant, binary_model.df_resid)
+                * (1 - binary_model.prsquared))
+
 
 # %% {"tags": []}
 import statsmodels.formula.api as smf
@@ -324,6 +391,7 @@ def regression(
     # covariates_df: Union[pyspark.Broadcast, pd.DataFrame],
     clumping_variants_df: Union[pyspark.Broadcast, pd.DataFrame] = None,
     add_clumping: bool = config["covariates"]["add_clumping"],
+    boolean_regression=is_boolean_dtype,
 ):
     if isinstance(groupby_columns, str):
         groupby_columns = [groupby_columns]
@@ -356,7 +424,7 @@ def regression(
             # ## unpacking done
             
             # print("dereferencing done")
-
+            
             formatted_restricted_formula = format_formula(
                 formula=restricted_formula,
                 keys=keys,
@@ -373,20 +441,13 @@ def regression(
             # get necessary columns
             restricted_variables = get_variables_from_formula(formatted_restricted_formula)
             full_variables = get_variables_from_formula(formatted_full_formula)
+            target_variables = get_variables_from_formula(formatted_restricted_formula, rhs=False)
             necessary_columns = {
                 *restricted_variables,
                 *full_variables,
                 "individual",
             }
             
-            # filter covariates for necessary columns
-            # covariates_df = covariates_df.select([c for c in covariates_df.column_names if c in necessary_columns]).to_pandas()
-            
-            #covariates_df = pd.read_feather(
-            #    path = pyspark.SparkFiles.get(covariates_sparkfilename),
-            #    columns=[c for c in covariates_df_columns if c in necessary_columns],
-            #    use_threads=False,
-            #)
             # make sure to use memory-mapping and disable threading
             covariates_df = feather.read_feather(
                 pyspark.SparkFiles.get(covariates_sparkfilename),
@@ -401,24 +462,47 @@ def regression(
             data_df = data_df.fillna({
                 c: 0 for c in pd_df.columns
             })
-        
-            # restricted_model = broadcast_restricted_model.value
-            restricted_model = smf.ols(
-                formatted_restricted_formula,
-                data = data_df
-            ).fit()
+            # cast phenotype to float
+            for tv in target_variables:
+                data_df = data_df.assign(**{
+                    tv: data_df[tv].astype("float32")
+                })
             
-#             randomized_model = smf.ols(
-#                 restricted_formula,
-#                 data = data_df
-#             ).fit()
             
-            model = smf.ols(
-                formatted_full_formula,
-                data = data_df
-            ).fit()
-            
-            lr_stat, lr_pval, lr_df_diff = model.compare_lr_test(restricted_model)
+            if boolean_regression:
+                restricted_model = smf.logit(
+                    formatted_restricted_formula,
+                    data = data_df
+                ).fit()
+                
+                full_model = smf.logit(
+                    formatted_full_formula,
+                    data = data_df
+                ).fit()
+
+                # calculate statistics
+                lr_stat, lr_pval, lr_df_diff = lr_test(restricted_model, full_model)
+                rsquared_restricted = prsquared_adj(restricted_model)
+                rsquared_restricted_raw = restricted_model.prsquared
+                rsquared = prsquared_adj(full_model)
+                rsquared_raw = full_model.prsquared
+            else:
+                restricted_model = smf.ols(
+                    formatted_restricted_formula,
+                    data = data_df
+                ).fit()
+                
+                full_model = smf.ols(
+                    formatted_full_formula,
+                    data = data_df
+                ).fit()
+
+                # calculate statistics
+                lr_stat, lr_pval, lr_df_diff = full_model.compare_lr_test(restricted_model)
+                rsquared_restricted = restricted_model.rsquared_adj
+                rsquared_restricted_raw = restricted_model.rsquared
+                rsquared = full_model.rsquared_adj
+                rsquared_raw = full_model.rsquared
 
             return (
                 pd_df
@@ -426,14 +510,14 @@ def regression(
                 .iloc[:1]
                 .copy()
                 .assign(**{
-                    "n_observations": [int(model.nobs)],
-                    "term_pvals": [model.pvalues.to_dict()], 
-                    "params": [model.params.to_dict()], 
-                    "loglikelihood": [model.llf],
-                    "rsquared_restricted": [restricted_model.rsquared_adj],
-                    "rsquared_restricted_raw": [restricted_model.rsquared],
-                    "rsquared": [model.rsquared_adj],
-                    "rsquared_raw": [model.rsquared],
+                    "n_observations": [int(full_model.nobs)],
+                    "term_pvals": [full_model.pvalues.to_dict()], 
+                    "params": [full_model.params.to_dict()], 
+                    "loglikelihood": [full_model.llf],
+                    "rsquared_restricted": [rsquared_restricted],
+                    "rsquared_restricted_raw": [rsquared_restricted_raw],
+                    "rsquared": [rsquared],
+                    "rsquared_raw": [rsquared_raw],
                     "lr_stat": [lr_stat],
                     "lr_pval": [lr_pval],
                     "lr_df_diff": [lr_df_diff],
@@ -628,6 +712,7 @@ regression_results_sdf.printSchema()
 # %%
 
 # %%
+snakemake.output
 
 # %% {"tags": []}
 regression_results_sdf.write.parquet(snakemake.output["associations_pq"], mode="overwrite")
