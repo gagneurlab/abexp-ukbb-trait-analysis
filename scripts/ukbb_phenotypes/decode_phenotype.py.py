@@ -271,6 +271,29 @@ if "expression" in phenotype_coding:
     )
     phenotype_df.printSchema()
 
+# %% [markdown]
+# ## fill value if existing
+
+# %%
+phenotype_df.schema[snakemake.wildcards["phenotype"]].dataType == t.BooleanType()
+
+# %%
+if "fill_value" in phenotype_coding:
+    condition = f.isnull(f.col(snakemake.wildcards["phenotype"]))
+    if (
+        phenotype_df.schema[snakemake.wildcards["phenotype"]].dataType == t.FloatType()
+        or phenotype_df.schema[snakemake.wildcards["phenotype"]].dataType == t.DoubleType()
+    ):
+        condition = condition | f.isnan(f.col(snakemake.wildcards["phenotype"]))
+    
+    phenotype_df = phenotype_df.withColumn(snakemake.wildcards["phenotype"],
+        f.when(
+            condition,
+            f.lit(phenotype_coding["fill_value"])
+        )
+    )
+    phenotype_df.printSchema()
+
 # %%
 snakemake.output
 

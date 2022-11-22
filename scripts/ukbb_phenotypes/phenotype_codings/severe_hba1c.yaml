@@ -6,3 +6,5 @@ fields:
   'glycated_haemoglobin_hba1c_f30750_(\d*)_0':
 
 expression: '{col} > 42'
+
+fill_value: False

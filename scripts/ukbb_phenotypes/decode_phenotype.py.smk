@@ -14,7 +14,7 @@ rule decode_phenotype:
         phenotype_pq=directory(f"{UKBB_DECODED_PHENOTYPES_DIR}/{{phenotype}}/data.parquet"),
     input:
         latest_meta_pq=f"{UKBB_PROCESSED_PHENOTYPES_DIR}/latest.meta.parquet",
-        phenotype_coding_yaml=f"{SNAKEFILE_DIR}/phenotype_codings/{{phenotype}}.yaml",
+        phenotype_coding_yaml=ancient(f"{SNAKEFILE_DIR}/phenotype_codings/{{phenotype}}.yaml"),
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
         output_basepath=f"{UKBB_DECODED_PHENOTYPES_DIR}/{{phenotype}}",

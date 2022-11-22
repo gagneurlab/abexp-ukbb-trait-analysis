@@ -6,3 +6,5 @@ fields:
   'ldl_direct_f30780_(\d*)_0':
 
 expression: '{col} > 4.9'
+
+fill_value: False

@@ -5,3 +5,5 @@ fields:
   # field.showcase: [list of matching terms]
   'diabetes_diagnosed_by_doctor_f2443_(\d*)_0':
   - 1
+
+fill_value: False
