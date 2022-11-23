@@ -110,7 +110,8 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__regression',
         default_wildcards={
-            "phenotype_col": "Asthma",
+            "phenotype_col": "severe_LDL",
+            # "phenotype_col": "Asthma",
             # "phenotype_col": "triglycerides_f30870_0_0",
             # "phenotype_col": "standing_height_f50_0_0",
             # "phenotype_col": "body_mass_index_bmi_f21001_0_0",
@@ -297,16 +298,6 @@ def deref(obj):
 # broadcast_covariates_df = broadcast(covariates_df.to_arrow())
 broadcast_clumping_variants_df = broadcast(clumping_variants_df)
 
-# %% {"tags": []}
-# restricted_model = smf.ols(
-#     restricted_formula,
-#     data = (
-#         covariates_df
-#         .assign(sex_f31_0_0=covariates_df["sex_f31_0_0"].where(np.random.randint(0, 2, size=covariates_df.shape[0], dtype=bool))),
-#     )
-# ).fit()
-# broadcast_restricted_model = spark.sparkContext.broadcast(restricted_model)
-
 # %%
 # covariates_pq_path = snakemake.input["covariates_pq"]
 # covariates_df_columns = covariates_df.columns
@@ -331,6 +322,18 @@ if is_boolean_dtype:
     print("Regression type is boolean!")
 else:
     print("Regression type is continuous!")
+
+# %%
+# from sklearn.decomposition import PCA
+# pca = PCA(n_components = X_train_std.shape[1])
+# pca_data = pca.fit_transform(X_train_std)
+
+# %% {"tags": []}
+# restricted_model = smf.logit(
+#     restricted_formula,
+#     data = data_df.to_pandas().astype({snakemake.wildcards["phenotype_col"]: "float32"})
+# ).fit()
+# # broadcast_restricted_model = spark.sparkContext.broadcast(restricted_model)
 
 # %%
 from scipy.stats.distributions import chi2
@@ -470,37 +473,95 @@ def regression(
             
             
             if boolean_regression:
-                restricted_model = smf.logit(
-                    formatted_restricted_formula,
-                    data = data_df
-                ).fit()
-                
-                full_model = smf.logit(
-                    formatted_full_formula,
-                    data = data_df
-                ).fit()
+                try:
+                    converged = False
+                    try:
+                        restricted_model = smf.logit(
+                            formatted_restricted_formula,
+                            data = data_df
+                        ).fit(maxiter=200, disp=0, warn_convergence=False)
+
+                        full_model = smf.logit(
+                            formatted_full_formula,
+                            data = data_df
+                        ).fit(maxiter=200, disp=0, warn_convergence=False)
+                        
+                        converged = restricted_model.mle_retvals["converged"] & full_model.mle_retvals["converged"]
+                    except np.linalg.LinAlgError as linalg_error:
+                        # newton failed
+                        pass
+                    
+                    if not converged:
+                        # retry with l-bfgs-b
+                        # print("retry with l-bfgs-b")
+                        restricted_model = smf.logit(
+                            formatted_restricted_formula,
+                            data = data_df
+                        ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
+
+                        full_model = smf.logit(
+                            formatted_full_formula,
+                            data = data_df
+                        ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
+                except Exception as e:
+                    print("---------------- error log -----------------")
+                    print("keys:")
+                    print(keys)
+                    print("-------------- error log end ---------------")
+                    raise e
 
                 # calculate statistics
                 lr_stat, lr_pval, lr_df_diff = lr_test(restricted_model, full_model)
+                restricted_model_converged = restricted_model.mle_retvals["converged"]
                 rsquared_restricted = prsquared_adj(restricted_model)
                 rsquared_restricted_raw = restricted_model.prsquared
+                full_model_converged = full_model.mle_retvals["converged"]
                 rsquared = prsquared_adj(full_model)
                 rsquared_raw = full_model.prsquared
             else:
-                restricted_model = smf.ols(
-                    formatted_restricted_formula,
-                    data = data_df
-                ).fit()
-                
-                full_model = smf.ols(
-                    formatted_full_formula,
-                    data = data_df
-                ).fit()
+                try:
+                    converged = False
+                    try:
+                        restricted_model = smf.ols(
+                            formatted_restricted_formula,
+                            data = data_df
+                        ).fit(maxiter=200, disp=0, warn_convergence=False)
+
+                        full_model = smf.ols(
+                            formatted_full_formula,
+                            data = data_df
+                        ).fit(maxiter=200, disp=0, warn_convergence=False)
+                        
+                        converged = restricted_model.mle_retvals["converged"] & full_model.mle_retvals["converged"]
+                    except np.linalg.LinAlgError as linalg_error:
+                        # newton failed
+                        pass
+                    
+                    if not converged:
+                        # retry with l-bfgs-b
+                        # print("retry with l-bfgs-b")
+                        restricted_model = smf.ols(
+                            formatted_restricted_formula,
+                            data = data_df
+                        ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
+
+                        full_model = smf.ols(
+                            formatted_full_formula,
+                            data = data_df
+                        ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
+                except Exception as e:
+                    print("---------------- error log -----------------")
+                    print("keys:")
+                    print(keys)
+                    print("-------------- error log end ---------------")
+                    raise e
 
                 # calculate statistics
                 lr_stat, lr_pval, lr_df_diff = full_model.compare_lr_test(restricted_model)
+                restricted_model_converged = restricted_model.mle_retvals["converged"]
                 rsquared_restricted = restricted_model.rsquared_adj
                 rsquared_restricted_raw = restricted_model.rsquared
+                full_model_converged = full_model.mle_retvals["converged"]
                 rsquared = full_model.rsquared_adj
                 rsquared_raw = full_model.rsquared
 
@@ -512,8 +573,11 @@ def regression(
                 .assign(**{
                     "n_observations": [int(full_model.nobs)],
                     "term_pvals": [full_model.pvalues.to_dict()], 
-                    "params": [full_model.params.to_dict()], 
-                    "loglikelihood": [full_model.llf],
+                    "params": [full_model.params.to_dict()],
+                    "restricted_model_converged": [restricted_model_converged],
+                    "full_model_converged": [full_model_converged],
+                    "restricted_model_llf": [restricted_model.llf],
+                    "full_model_llf": [full_model.llf],
                     "rsquared_restricted": [rsquared_restricted],
                     "rsquared_restricted_raw": [rsquared_restricted_raw],
                     "rsquared": [rsquared],
@@ -531,7 +595,10 @@ def regression(
             t.StructField("n_observations", t.LongType()),
             t.StructField("term_pvals", t.MapType(t.StringType(), t.DoubleType())),
             t.StructField("params", t.MapType(t.StringType(), t.DoubleType())),
-            t.StructField("loglikelihood", t.DoubleType()),
+            t.StructField("restricted_model_converged", t.BooleanType()),
+            t.StructField("full_model_converged", t.BooleanType()),
+            t.StructField("restricted_model_llf", t.DoubleType()),
+            t.StructField("full_model_llf", t.DoubleType()),
             t.StructField("rsquared_restricted", t.DoubleType()),
             t.StructField("rsquared_restricted_raw", t.DoubleType()),
             t.StructField("rsquared", t.DoubleType()),
@@ -693,18 +760,22 @@ regression_results_sdf.printSchema()
 # for debugging
 
 # %% [raw]
-# renamed_features_df.select("gene").distinct().limit(10).toPandas()["gene"].tolist()
+# gene_list = renamed_features_df.select("gene").distinct().limit(10).toPandas()["gene"].tolist()
+# gene_list
+
+# %% [raw]
+# gene_list = ['ENSG00000004059']
 
 # %% [raw]
 # %%time
 # test = regression(
 #     renamed_features_df.filter(f.col("gene").isin(
-#         renamed_features_df.select("gene").distinct().limit(64).toPandas()["gene"].tolist()
+#         gene_list
 #     )).repartition(2, "gene"), 
 #     groupby_columns=groupby_columns, 
 #     full_formula=full_formula,
 #     restricted_formula=restricted_formula,
-#     covariates_df=broadcast_covariates_df,
+#     # covariates_df=broadcast_covariates_df,
 #     clumping_variants_df=broadcast_clumping_variants_df,
 # ).toPandas()
 # test
