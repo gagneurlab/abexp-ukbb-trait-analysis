@@ -69,12 +69,13 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__compare_genebass',
         default_wildcards={
-            "phenotype_col": "triglycerides_f30870_0_0",
+            "phenotype_col": "severe_LDL",
+            # "phenotype_col": "triglycerides_f30870_0_0",
             #"phenotype_col": "hdl_cholesterol_f30760_0_0",
-            #"feature_set": "LOFTEE_pLoF",
-            "feature_set": "AbExp_all_tissues",
-            # "covariates": "sex_age_genPC",
-            "covariates": "sex_age_genPC_CLMP_PRS",
+            "feature_set": "LOFTEE_pLoF",
+            # "feature_set": "AbExp_all_tissues",
+            "covariates": "sex_age_genPC",
+            # "covariates": "sex_age_genPC_CLMP_PRS",
         }
     )
 
@@ -405,9 +406,19 @@ stats_df = (
     regression_results_df.to_pandas()
     .set_index("gene")
     .loc[:, [
-        'n_observations', 'loglikelihood',
-        'lr_stat', 'lr_df_diff', 'rsquared_restricted',
-        'rsquared', 'rsquared_diff', 'lr_pval', 'padj',
+        'n_observations',
+        'restricted_model_converged',
+        'full_model_converged',
+        'restricted_model_llf',
+        'full_model_llf',
+        'lr_stat', 'lr_df_diff',
+        'rsquared_restricted',
+        "rsquared_restricted_raw",
+        'rsquared',
+        "rsquared_raw",
+        'rsquared_diff',
+        'lr_pval',
+        'padj',
     ]]
     .join(significant_genes[["Genebass", "Genebass_signif"]], how="right")
     .sort_values("padj")
