@@ -352,13 +352,11 @@ def lr_test(
     - https://stackoverflow.com/a/70488612/2219819
     - statsmodels.regression.linear_model.RegressionResults class
     """
-    
-    df0, df1 = restricted_model.df_model, full_model.df_model
     df_diff = full_model.df_model - restricted_model.df_model
     
     chi2_stat = likelihood_ratio(
         restricted_model.llf,
-        df_diff,
+        full_model.llf,
     )
     p = chi2.sf(chi2_stat, df_diff)
 
