@@ -4,3 +4,5 @@ type: mean
 fields:
   # field.showcase: [list of matching terms]
   'hdl_cholesterol_f30760_(\d*)_0':
+
+quantile_norm: True

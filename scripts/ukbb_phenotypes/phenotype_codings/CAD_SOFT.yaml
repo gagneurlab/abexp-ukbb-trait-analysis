@@ -1,5 +1,9 @@
 
-any:
+type: any
+
+fill_value: False
+
+fields:
   # field.showcase: [list of matching terms]
   'diagnoses_icd9_f41271_0_(.*)':
   - '410'

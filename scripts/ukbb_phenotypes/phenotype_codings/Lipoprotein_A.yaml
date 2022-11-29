@@ -4,3 +4,5 @@ type: mean
 fields:
   # field.showcase: [list of matching terms]
   'lipoprotein_a_f30790_(\d*)_0':
+
+quantile_norm: True

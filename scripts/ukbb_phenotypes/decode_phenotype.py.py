@@ -91,8 +91,8 @@ except NameError:
         default_wildcards={
             # "phenotype": "severe_LDL",
             # "phenotype": "Diabetes",
-            # "phenotype": "standing_height",
-            "phenotype": "Asthma",
+            "phenotype": "standing_height",
+            # "phenotype": "Asthma",
         }
     )
 
@@ -300,18 +300,47 @@ if "fill_value" in phenotype_coding:
 snakemake.output
 
 # %%
-(
+phenotype_pd_df = (
     phenotype_df
     .sort(["eid"])
-    .write.parquet(snakemake.output["phenotype_pq"], mode="overwrite")
+    .dropna()
+    # .write.parquet(snakemake.output["phenotype_pq"], mode="overwrite")
+    .toPandas()
 )
-
-# %%
-phenotype_df = spark.read.parquet(snakemake.output["phenotype_pq"])
-
-# %%
-phenotype_pd_df = phenotype_df.toPandas()
 phenotype_pd_df
+
+# %%
+import scipy.stats
+
+def irnt(x: pd.Series) -> np.array:
+    """
+    inverse rank normal transformation as used by PHESANT:
+    https://github.com/MRCIEU/PHESANT/blob/3f4a65d7fe93aaf01f3a4a3f39843562612a8d65/WAS/testContinuous.r#L243-L249
+    
+    :param x: Pandas Series with the (continuous) input values
+    :returns: irnt values
+    """
+    numPhenos = x.notna().sum()
+    quantilePheno = (x.rank() - 0.5) / numPhenos
+    phenoIRNT = scipy.stats.norm.ppf(quantilePheno)
+    return phenoIRNT
+
+
+# %%
+if phenotype_coding.get("quantile_norm", False):
+    phenotype_pd_df = phenotype_pd_df.assign(**{
+        f"""{snakemake.wildcards["phenotype"]}_raw""": phenotype_pd_df[snakemake.wildcards["phenotype"]],
+        snakemake.wildcards["phenotype"]: irnt(phenotype_pd_df[snakemake.wildcards["phenotype"]]),
+    })
+
+# %%
+phenotype_pd_df
+
+# %%
+snakemake.output["phenotype_pq"]
+
+# %%
+phenotype_pd_df.to_parquet(snakemake.output["phenotype_pq"])
 
 # %%
 import plotnine as pn

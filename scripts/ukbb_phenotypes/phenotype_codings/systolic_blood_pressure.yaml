@@ -4,3 +4,5 @@ type: mean
 fields:
   # field.showcase: [list of matching terms]
   'systolic_blood_pressure_automated_reading_f4080_(\d*)_0':
+
+quantile_norm: True

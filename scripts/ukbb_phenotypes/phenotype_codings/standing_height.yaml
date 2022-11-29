@@ -4,3 +4,5 @@ type: mean
 fields:
   # field.showcase: [list of matching terms]
   'standing_height_f50_(\d*)_0':
+
+quantile_norm: True
