@@ -110,19 +110,21 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__regression',
         default_wildcards={
-            "phenotype_col": "severe_LDL",
+            # "phenotype_col": "severe_LDL",
             # "phenotype_col": "Asthma",
+            "phenotype_col": "Triglycerides",
             # "phenotype_col": "triglycerides_f30870_0_0",
             # "phenotype_col": "standing_height_f50_0_0",
             # "phenotype_col": "body_mass_index_bmi_f21001_0_0",
             # "phenotype_col": "systolic_blood_pressure_automated_reading_f4080_0_0",
             # "phenotype_col": "hdl_cholesterol_f30760_0_0",
-            "feature_set": "LOFTEE_pLoF",
-            # "feature_set": "AbExp_all_tissues",
             # "feature_set": "LOFTEE_pLoF",
+            "feature_set": "AbExp_all_tissues",
+            # "feature_set": "LOFTEE_pLoF",
+            "covariates": "randomized_sex_age_genPC_CLMP_PRS",
             # "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex_age_genPC_CLMP",
-            "covariates": "sex_age_genPC",
+            # "covariates": "sex_age_genPC",
         }
     )
 
@@ -470,8 +472,8 @@ def regression(
                 })
             
             
-            if boolean_regression:
-                try:
+            try:
+                if boolean_regression:
                     converged = False
                     try:
                         restricted_model = smf.logit(
@@ -483,12 +485,12 @@ def regression(
                             formatted_full_formula,
                             data = data_df
                         ).fit(maxiter=200, disp=0, warn_convergence=False)
-                        
+
                         converged = restricted_model.mle_retvals["converged"] & full_model.mle_retvals["converged"]
                     except np.linalg.LinAlgError as linalg_error:
                         # newton failed
                         pass
-                    
+
                     if not converged:
                         # retry with l-bfgs-b
                         # print("retry with l-bfgs-b")
@@ -501,67 +503,41 @@ def regression(
                             formatted_full_formula,
                             data = data_df
                         ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
-                except Exception as e:
-                    print("---------------- error log -----------------")
-                    print("keys:")
-                    print(keys)
-                    print("-------------- error log end ---------------")
-                    raise e
 
-                # calculate statistics
-                lr_stat, lr_pval, lr_df_diff = lr_test(restricted_model, full_model)
-                restricted_model_converged = restricted_model.mle_retvals["converged"]
-                rsquared_restricted = prsquared_adj(restricted_model)
-                rsquared_restricted_raw = restricted_model.prsquared
-                full_model_converged = full_model.mle_retvals["converged"]
-                rsquared = prsquared_adj(full_model)
-                rsquared_raw = full_model.prsquared
-            else:
-                try:
-                    converged = False
-                    try:
-                        restricted_model = smf.ols(
-                            formatted_restricted_formula,
-                            data = data_df
-                        ).fit(maxiter=200, disp=0, warn_convergence=False)
+                    # calculate statistics
+                    lr_stat, lr_pval, lr_df_diff = lr_test(restricted_model, full_model)
+                    restricted_model_converged = restricted_model.mle_retvals["converged"]
+                    rsquared_restricted = prsquared_adj(restricted_model)
+                    rsquared_restricted_raw = restricted_model.prsquared
+                    full_model_converged = full_model.mle_retvals["converged"]
+                    rsquared = prsquared_adj(full_model)
+                    rsquared_raw = full_model.prsquared
+                else:
+                    restricted_model = smf.ols(
+                        formatted_restricted_formula,
+                        data = data_df
+                    ).fit()
 
-                        full_model = smf.ols(
-                            formatted_full_formula,
-                            data = data_df
-                        ).fit(maxiter=200, disp=0, warn_convergence=False)
-                        
-                        converged = restricted_model.mle_retvals["converged"] & full_model.mle_retvals["converged"]
-                    except np.linalg.LinAlgError as linalg_error:
-                        # newton failed
-                        pass
-                    
-                    if not converged:
-                        # retry with l-bfgs-b
-                        # print("retry with l-bfgs-b")
-                        restricted_model = smf.ols(
-                            formatted_restricted_formula,
-                            data = data_df
-                        ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
+                    full_model = smf.ols(
+                        formatted_full_formula,
+                        data = data_df
+                    ).fit()
 
-                        full_model = smf.ols(
-                            formatted_full_formula,
-                            data = data_df
-                        ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
-                except Exception as e:
-                    print("---------------- error log -----------------")
-                    print("keys:")
-                    print(keys)
-                    print("-------------- error log end ---------------")
-                    raise e
-
-                # calculate statistics
-                lr_stat, lr_pval, lr_df_diff = full_model.compare_lr_test(restricted_model)
-                restricted_model_converged = restricted_model.mle_retvals["converged"]
-                rsquared_restricted = restricted_model.rsquared_adj
-                rsquared_restricted_raw = restricted_model.rsquared
-                full_model_converged = full_model.mle_retvals["converged"]
-                rsquared = full_model.rsquared_adj
-                rsquared_raw = full_model.rsquared
+                    # calculate statistics
+                    lr_stat, lr_pval, lr_df_diff = full_model.compare_lr_test(restricted_model)
+                    restricted_model_converged = True
+                    rsquared_restricted = restricted_model.rsquared_adj
+                    rsquared_restricted_raw = restricted_model.rsquared
+                    full_model_converged = True
+                    rsquared = full_model.rsquared_adj
+                    rsquared_raw = full_model.rsquared
+                
+            except Exception as e:
+                print("---------------- error log -----------------")
+                print("keys:")
+                print(keys)
+                print("-------------- error log end ---------------")
+                raise e
 
             return (
                 pd_df
