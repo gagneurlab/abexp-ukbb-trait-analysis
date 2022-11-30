@@ -43,7 +43,7 @@ snakefile_path = os.getcwd() + "/../../Snakefile"
 snakefile_path
 
 # %%
-# del snakemake
+#del snakemake
 
 # %%
 try:
@@ -55,9 +55,13 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'covariates',
         default_wildcards={
-            "phenotype_col": "HDL_cholesterol",
+            # "phenotype_col": "Asthma",
+            # "phenotype_col": "Diabetes",
+            # "phenotype_col": "HDL_cholesterol",
+            "phenotype_col": "standing_height",
             # "phenotype_col": "systolic_blood_pressure_f4080_0_0",
-            "covariates": "sex_age_genPC_CLMP_PRS",
+            "covariates": "randomized_sex_age_genPC_CLMP_PRS",
+            # "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex+age+genPC+CLMP",
             # "covariates": "sex_age_genPC",
         }
@@ -114,6 +118,10 @@ config["add_clumping"]
 # %%
 config["clumping_gene_padding"] = config.get("clumping_gene_padding", 0)
 config["clumping_gene_padding"]
+
+# %%
+config["clumping_use_pca"] = config.get("clumping_use_pca", False)
+config["clumping_use_pca"]
 
 # %%
 config["add_PRS"] = config.get("add_PRS", False)
@@ -227,7 +235,7 @@ samples_df
 # ## phenotypes
 
 # %%
-phenotype_df = pl.scan_parquet(snakemake.input["decoded_phenotype_pq"] + "/*.parquet").sort("eid")
+phenotype_df = pl.read_parquet(snakemake.input["decoded_phenotype_pq"]).sort("eid").lazy()
 phenotype_df.schema
 
 # %%
@@ -264,7 +272,8 @@ data_df = data_df.with_column(pl.col("individual").cast(pl.Utf8).alias("individu
 # %%
 # shuffle phenotype column if requested
 if config["randomize_phenotype"]:
-    data_df = data_df.with_column(pl.col(phenotype_col).shuffle(seed=42))
+    print("shuffling phenotype...")
+    data_df = data_df.with_column(pl.col(phenotype_col).shuffle(seed=42).alias(phenotype_col))
 
 # %%
 # change order of columns
