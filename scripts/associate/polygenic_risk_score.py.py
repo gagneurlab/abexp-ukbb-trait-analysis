@@ -29,7 +29,7 @@ import pyspark
 import pyspark.sql.types as t
 import pyspark.sql.functions as f
 
-import glow
+# import glow
 
 # %%
 import polars as pl
@@ -85,10 +85,11 @@ if use_ray:
         #     "spark.default.parallelism": int(ray.cluster_resources()["CPU"]),
         #     "spark.sql.shuffle.partitions": 2048,
         # }
+        enable_glow=False,
     )
 else:
     from rep.notebook_init import init_spark
-    spark = init_spark()
+    spark = init_spark(enable_glow=False)
 
 # %%
 ray_context
@@ -332,7 +333,7 @@ full_features_df.printSchema()
 
 
 # %% [markdown]
-# # setup formulas
+# # select variables
 
 # %%
 def format_formula(formula, add_clumping=True, clumping_variants=clumping_variants):
@@ -351,18 +352,12 @@ def format_formula(formula, add_clumping=True, clumping_variants=clumping_varian
 
 
 # %%
-formatted_restricted_formula = format_formula(
-    formula=restricted_formula,
-    add_clumping=config["covariates"]["add_clumping"],
-)
-
-# %% {"tags": []}
-formatted_restricted_formula
+# formatted_restricted_formula = patsy.ModelDesc.from_formula(restricted_formula)
 
 # %%
 formatted_full_formula = format_formula(
     formula=restricted_formula,
-    add_clumping=config["covariates"]["add_clumping"],
+    add_clumping=False, # do not add clumping variants!
 )
 if len(gene_features) > 0:
     formatted_full_formula.rhs_termlist += [
@@ -393,10 +388,6 @@ def get_variables_from_formula(formula, lhs=True, rhs=True):
     
     return covariate_cols
 
-
-# %% {"tags": []}
-restricted_variables = get_variables_from_formula(formatted_restricted_formula)
-len(restricted_variables)
 
 # %% {"tags": []}
 full_variables = get_variables_from_formula(formatted_full_formula)
@@ -436,7 +427,118 @@ prs_features_pd_df.head()
 # %%
 
 # %% [markdown]
+# # read samples
+
+# %%
+samples = pd.read_parquet(snakemake.input["samples_pq"])
+samples
+
+# %%
+train_samples = samples.loc[samples["fold"] != "test", "individual"].values
+train_samples
+
+# %%
+test_samples = samples.loc[samples["fold"] == "test", "individual"].values
+test_samples
+
+# %% [markdown]
+# ## join with prs features
+
+# %%
+prs_features_pd_df = prs_features_pd_df.merge(samples, on="individual", how="inner")
+prs_features_pd_df
+
+# %% [markdown]
+# ## prepare splits
+
+# %%
+non_test_idx
+
+# %% [markdown]
 # # perform regression
+
+# %%
+import sklearn
+import sklearn.pipeline
+import sklearn.linear_model
+import sklearn.preprocessing
+import sklearn.metrics
+
+# %% [markdown]
+# ## prepare training data
+
+# %%
+train_df = prs_features_pd_df[prs_features_pd_df["individual"].isin(train_samples)]
+train_df
+
+# %%
+cv_split = sklearn.model_selection.PredefinedSplit(train_df["fold"].str.split(" ").apply(lambda s: s[-1]).astype("int"))
+cv_split
+
+# %%
+cv_split.get_n_splits()
+
+# %%
+test_df = prs_features_pd_df[prs_features_pd_df["individual"].isin(test_samples)]
+test_df
+
+# %%
+X_train = train_df[restricted_variables].drop(columns=phenotype_col)
+y_train = train_df[phenotype_col]
+
+# %%
+X_test = test_df[restricted_variables].drop(columns=phenotype_col)
+y_test = test_df[phenotype_col]
+
+# %% [markdown]
+# ## train models
+
+# %%
+# TODO for Jonas
+
+# %% [raw]
+# ### restricted model
+
+# %% [raw]
+# model_pipeline = sklearn.pipeline.Pipeline([
+#     ("normalize", sklearn.preprocessing.StandardScaler()),
+#     ("linear_model", sklearn.linear_model.ElasticNetCV(cv=cv_split)),
+# ])
+
+# %% [raw]
+# restricted_model = model_pipeline.fit(X_train, y_train)
+# restricted_model
+
+# %% [raw]
+# restricted_pred_test = restricted_model.predict(X_test)
+# restricted_pred_test
+
+# %% [raw]
+# sklearn.metrics.r2_score(y_test, restricted_pred_test)
+
+# %% [raw]
+# ### full model
+
+# %%
+model_pipeline = sklearn.pipeline.Pipeline([
+    ("normalize", sklearn.preprocessing.StandardScaler()),
+    ("linear_model", sklearn.linear_model.ElasticNetCV(cv=cv_split)),
+])
+
+# %%
+full_model = model_pipeline.fit(X_train, y_train)
+full_model
+
+# %%
+full_pred_test = full_model.predict(X_test)
+full_pred_test
+
+# %%
+sklearn.metrics.r2_score(y_test, full_pred_test)
+
+# %%
+
+# %%
 
 # %% {"tags": []}
 import statsmodels.formula.api as smf
@@ -553,6 +655,9 @@ full_params_df.to_parquet(snakemake.output["full_params_pq"], index=False)
 
 # %% [markdown]
 # # plotting
+
+# %%
+# TODO for Jonas
 
 # %% [markdown]
 # ## phenotype correlation

@@ -36,6 +36,9 @@ rule associate__polygenic_risk_score:
         covariates_pq=f'''{COVARIATES_BASEPATH}/covariates.parquet''',
         # clumping
         clumping_variants_pq=f'''{COVARIATES_BASEPATH}/clumping_variants.parquet''',
+        # sample splits
+        samples_pq=f"{COVARIATES_BASEPATH}/samples.parquet",
+        samples_pq_done=f"{COVARIATES_BASEPATH}/samples.parquet.done",
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
         output_basedir=OUTPUT_BASEPATH,
@@ -52,6 +55,4 @@ rule associate__polygenic_risk_score:
 del COVARIATES_BASEPATH
 del ASSOCIATION_BASEPATH
 del OUTPUT_BASEPATH
-
-localrules: associate__regression_config
 
