@@ -12,6 +12,7 @@ include: f"{SNAKEFILE_DIR}/qq_plot.py.smk"
 include: f"{SNAKEFILE_DIR}/polygenic_risk_score.py.smk"
 # include: f"{SNAKEFILE_DIR}/lm_plot.py.smk"
 include: f"{SNAKEFILE_DIR}/samples.py.smk"
+include: f"{SNAKEFILE_DIR}/train_test_split.py.smk"
 
 # subdirectories
 smkpaths = [
