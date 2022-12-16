@@ -79,7 +79,9 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__qq_plot',
         default_wildcards={
-            "phenotype_col": "Triglycerides",
+            "phenotype_col": "Asthma",
+            # "phenotype_col": "Triglycerides",
+            # "phenotype_col": "LDL_direct",
             # "phenotype_col": "triglycerides_f30870_0_0",
             # "phenotype_col": "standing_height_f50_0_0",
             # "phenotype_col": "body_mass_index_bmi_f21001_0_0",
@@ -88,6 +90,7 @@ except NameError:
             # "feature_set": "LOFTEE_pLoF",
             "feature_set": "AbExp_all_tissues",
             # "feature_set": "LOFTEE_pLoF",
+            # "covariates": "randomizedOLS_sex_age_genPC_CLMP_PRS",
             "covariates": "randomized_sex_age_genPC_CLMP_PRS",
             # "covariates": "randomized_sex_age_genPC_CLMP",
             # "covariates": "randomized_sex_age_genPC",
@@ -150,23 +153,61 @@ plot_df["lr_pval"].min()
 snakemake.wildcards
 
 # %%
+sample = np.asarray(plot_df["lr_pval"].drop_nans())
+np.random.seed(0)
+theoretical = np.random.uniform(size=sample.shape[0])
+
+# %%
+sample
+
+# %%
+df = pd.DataFrame({
+    "sample": -np.log10(np.sort(sample)),
+    "theoretical": -np.log10(np.sort(theoretical)),
+})
+
+# %%
+df
+
+# %%
 plot = (
-    pn.ggplot(plot_df, pn.aes(sample="lr_pval"))
+    pn.ggplot(df, pn.aes(x="theoretical", y="sample"))
     + pn.geom_abline(slope=1, linetype="dashed", color="red")
-    + pn.stat_qq(distribution="uniform")
-    + pn.scale_x_log10(limits=(10**-20, 1))
-    + pn.scale_y_log10(limits=(10**-20, 1))
+    + pn.geom_point()
+    # + pn.scale_x_log10(limits=(10**-20, 1))
+    # + pn.scale_y_log10(limits=(10**-20, 1))
     + pn.labs(
         title="\n".join([
             f"""Q-Q plot of randomized p-values vs. random uniform distribution""",
             f"""phenotype: '{snakemake.wildcards["phenotype_col"]}'""",
             f"""feature set: '{snakemake.wildcards["feature_set"]}'""",
             f"""covariates: '{snakemake.wildcards["covariates"]}'""",
-        ])
+        ]),
+        x="-log10(p) theoretical",
+        y="-log10(p) sample",
     )
     + pn.theme(title=pn.element_text(linespacing=1.4))
 )
 display(plot)
+
+# %% [raw]
+# plot = (
+#     pn.ggplot(plot_df, pn.aes(sample="lr_pval"))
+#     + pn.geom_abline(slope=1, linetype="dashed", color="red")
+#     + pn.stat_qq(distribution="uniform")
+#     + pn.scale_x_log10(limits=(10**-20, 1))
+#     + pn.scale_y_log10(limits=(10**-20, 1))
+#     + pn.labs(
+#         title="\n".join([
+#             f"""Q-Q plot of randomized p-values vs. random uniform distribution""",
+#             f"""phenotype: '{snakemake.wildcards["phenotype_col"]}'""",
+#             f"""feature set: '{snakemake.wildcards["feature_set"]}'""",
+#             f"""covariates: '{snakemake.wildcards["covariates"]}'""",
+#         ])
+#     )
+#     + pn.theme(title=pn.element_text(linespacing=1.4))
+# )
+# display(plot)
 
 # %%
 snakemake.output
