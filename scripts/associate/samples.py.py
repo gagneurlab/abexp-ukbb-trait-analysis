@@ -59,26 +59,8 @@ print(json.dumps(snakemake.__dict__, indent=2, default=str))
 # # Load configuration
 
 # %%
-with open(snakemake.input["covariates_config"], "r") as fd:
-    config = yaml.safe_load(fd)
-
-# %%
-print(json.dumps(config, indent=2, default=str))
-
-# %%
 phenotype_col = snakemake.wildcards["phenotype_col"]
 phenotype_col
-
-# %%
-phenocode = config["phenocode"]
-phenocode
-
-# %%
-restricted_formula = config["restricted_formula"]
-print(restricted_formula)
-
-# %%
-pvalue_cutoff = 0.05
 
 # %%
 samples = pd.read_csv(snakemake.input["samples_txt"], header=None, names=["individual"], dtype={"individual": "string"})

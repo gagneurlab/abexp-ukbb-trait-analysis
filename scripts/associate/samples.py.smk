@@ -17,7 +17,7 @@ rule samples:
     input:
         samples_txt=config["samples"],
         phenotype_metadata_pq=f"{UKBB_PROCESSED_PHENOTYPES_DIR}/latest.meta.parquet",
-        covariates_config=f"{COVARIATES_BASEPATH}/config.yaml",
+        # covariates_config=f"{COVARIATES_BASEPATH}/config.yaml",
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
         # age_col='age_when_attended_assessment_centre_f21003_0_0',
