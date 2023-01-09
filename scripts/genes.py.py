@@ -50,10 +50,6 @@ import pyranges as pr
 # %config InlineBackend.figure_format='retina'
 
 # %%
-from rep.notebook_init import init_ray
-init_ray()
-
-# %%
 snakefile_path = os.getcwd() + "/../Snakefile"
 snakefile_path
 

@@ -55,13 +55,15 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'covariates',
         default_wildcards={
-            # "phenotype_col": "Asthma",
+            "phenotype_col": "Asthma",
             # "phenotype_col": "Diabetes",
             # "phenotype_col": "HDL_cholesterol",
-            "phenotype_col": "standing_height",
+            # "phenotype_col": "Triglycerides",
+            # "phenotype_col": "standing_height",
             # "phenotype_col": "systolic_blood_pressure_f4080_0_0",
-            "covariates": "randomized_sex_age_genPC_CLMP_PRS",
-            # "covariates": "sex_age_genPC_CLMP_PRS",
+            # "covariates": "randomized_sex_age_genPC_CLMP_PRS",
+            # "covariates": "randomizedOLS_sex_age_genPC_CLMP_PRS",
+            "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex+age+genPC+CLMP",
             # "covariates": "sex_age_genPC",
         }
@@ -134,6 +136,10 @@ config["randomize_phenotype"]
 # %%
 phenotype_col = snakemake.wildcards["phenotype_col"]
 phenotype_col
+
+# %%
+config["force_quantitative_regression"] = config.get("force_quantitative_regression", False)
+config["force_quantitative_regression"]
 
 # %% [markdown]
 # ## PRS / Clumping / phenocode
@@ -221,14 +227,7 @@ phenotype_metadata_subset.reset_index().to_csv(snakemake.output["metadata_tsv"],
 # ## read samples
 
 # %%
-with open(snakemake.input["samples_txt"], "r") as fd:
-    samples = fd.read().splitlines()
-samples[:10]
-
-# %%
-samples_df = pl.DataFrame({
-    "individual": sorted(samples)
-})
+samples_df = pl.read_parquet(snakemake.input["samples_pq"]).sort("individual")
 samples_df
 
 # %% [markdown] {"tags": []}
@@ -276,6 +275,12 @@ if config["randomize_phenotype"]:
     data_df = data_df.with_column(pl.col(phenotype_col).shuffle(seed=42).alias(phenotype_col))
 
 # %%
+# shuffle phenotype column if requested
+if config["force_quantitative_regression"]:
+    print("forcing quantitative phenotype...")
+    data_df = data_df.with_column(pl.col(phenotype_col).cast(pl.Float32()).alias(phenotype_col))
+
+# %%
 # change order of columns
 data_df = data_df.select([
     "individual",
@@ -285,6 +290,9 @@ data_df = data_df.select([
 
 # %%
 data_df.schema
+
+# %%
+data_df = data_df.collect().lazy()
 
 # %% [markdown] {"tags": []}
 # ## clumping
@@ -339,9 +347,14 @@ mac_index_vars = (
     mac_index_vars
     .select([
         "individual",
-        *[pl.col(c).cast(pl.Int8).alias(c) for c in variants["variant"]],
+        *[(
+            pl.col(c)
+            .cast(pl.Int8)
+            .fill_null(pl.lit(0))
+            .alias(c)
+        ) for c in variants["variant"]],
     ])
-)
+).collect().lazy()
 
 # %% {"tags": []}
 import pyranges as pr
@@ -438,12 +451,12 @@ snakemake.output
 )
 
 # %%
-#(
+# (
 #    pl.read_parquet(snakemake.output["covariates_pq"])
 #    .write_ipc(
-#        snakemake.output["covariates_ipc"],
+#        snakemake.output["covariates_pq"].replace("parquet", "feather"),
 #    )
-#)
+# )
 
 # %%
 

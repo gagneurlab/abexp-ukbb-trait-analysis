@@ -122,6 +122,8 @@ snakemake.input["associations_pq"]
 # %%
 regression_results_df = (
     pl.scan_parquet(snakemake.input["associations_pq"] + "/*.parquet")
+    .filter(pl.col("restricted_model_converged"))
+    .filter(pl.col("full_model_converged"))
     .sort("rsquared", reverse=True)
     .drop([
         "term_pvals",

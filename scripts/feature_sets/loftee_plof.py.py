@@ -29,7 +29,7 @@ import pyspark.sql.functions as f
 
 # + {"tags": []}
 from rep.notebook_init import init_spark
-spark = init_spark()
+spark = init_spark(enable_glow=False)
 # -
 
 spark
