@@ -121,9 +121,9 @@ except NameError:
             # "phenotype_col": "standing_height_f50_0_0",
             # "phenotype_col": "body_mass_index_bmi_f21001_0_0",
             # "phenotype_col": "systolic_blood_pressure_automated_reading_f4080_0_0",
-            #"phenotype_col": "hdl_cholesterol_f30760_0_0",
+            "phenotype_col": "HDL_cholesterol",
             #"phenotype_col": "ldl_direct_f30780_0_0",
-            "phenotype_col": "LDL_direct",
+            #"phenotype_col": "LDL_direct",
             #"phenotype_col": "Asthma",
             # "feature_set": "LOFTEE_pLoF",
             "feature_set": "AbExp_all_tissues",
@@ -450,8 +450,15 @@ prs_features_pd_df
 # # read samples
 
 # %%
-samples = pd.read_parquet(snakemake.input["samples_pq"])
+try:
+    samples = pd.read_parquet(snakemake.input["samples_pq"])
+except FileNotFoundError:
+    print("Defaulting")
+    samples = pd.read_parquet("'/s/project/rep/processed/trait_associations_v2/ukbb_wes_200k/associate/HDL_cholesterol/cov=sex_age_genPC_CLMP_PRS/samples.parquet'")
 samples
+
+# %%
+snakemake.input["samples_pq"]
 
 # %%
 train_samples = samples.loc[samples["fold"] != "test", "individual"].values
@@ -472,7 +479,7 @@ prs_features_pd_df
 prs_features_pd_df = prs_features_pd_df.dropna()
 prs_features_pd_df
 
-# %% [markdown]
+# %% [markdown] {"jp-MarkdownHeadingCollapsed": true, "tags": []}
 # ## prepare splits
 
 # %% [markdown]
