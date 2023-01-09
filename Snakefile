@@ -13,7 +13,7 @@ include: 'snakefile_utils.smk'
 # config['wBuildPath'] =  str(pathlib.Path(wbuild.__file__).parent)
 
 workdir: "./"
-configfile: "config_v2.yaml"
+configfile: "config_v3.yaml"
 
 # sync config directory
 eprint("Syncing config directory...")
@@ -60,40 +60,66 @@ hdl_cholesterol_term_pvals=expand(
 )
 
 all_phenotypes = [
-    "Asthma",
+    # "Asthma",
     "BodyMassIndex",
-    "CAD_HARD",
-    "CAD_SOFT",
+    # "CAD_HARD",
+    # "CAD_SOFT",
     # "c_reactive_protein", # missing data
-    "Diabetes",
+    # "Diabetes",
     "glycated_haemoglobin_hba1c", # blood sugar -> diabetes risk
     "HDL_cholesterol",
     "LDL_direct",
     "Lipoprotein_A",
-    "severe_LDL",
+    # # "severe_LDL",
     "standing_height",
-    # "systolic_blood_pressure", # bad results
+    "systolic_blood_pressure", # bad results
     "Triglycerides",
 ]
 all_phenotypes_output = [
     *expand(
         rules.associate__compare_genebass.output,
         phenotype_col=all_phenotypes,
-        feature_set=["LOFTEE_pLoF", "AbExp_all_tissues", "max_AbExp", "median_AbExp"],
-        covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS", "randomized_sex_age_genPC_CLMP_PRS"],
+        feature_set=[
+            "LOFTEE_pLoF",
+            "AbExp_all_tissues",
+            "max_AbExp",
+            "median_AbExp"
+        ],
+        covariates=[
+            "sex_age_genPC",
+            "sex_age_genPC_CLMP",
+            "sex_age_genPC_CLMP_PRS",
+            # "randomized_sex_age_genPC_CLMP_PRS",
+        ],
     ),
     *expand(
         rules.associate__compare_params.output,
         phenotype_col=all_phenotypes,
         feature_set=["AbExp_all_tissues",],
-        covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS", "randomized_sex_age_genPC_CLMP_PRS"],
+        covariates=[
+            "sex_age_genPC",
+            "sex_age_genPC_CLMP",
+            "sex_age_genPC_CLMP_PRS",
+            # "randomized_sex_age_genPC_CLMP_PRS",
+        ],
     ),
     *expand(
-        rules.associate__polygenic_risk_score.output,
+        rules.associate__qq_plot.output,
         phenotype_col=all_phenotypes,
-        feature_set=["LOFTEE_pLoF", "AbExp_all_tissues", "max_AbExp", "median_AbExp"],
-        covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS"],
-    )
+        feature_set=[
+            "LOFTEE_pLoF",
+            "AbExp_all_tissues",
+            "max_AbExp",
+            "median_AbExp"
+        ],
+        covariates=["randomized_sex_age_genPC_CLMP_PRS", ],
+    ),
+    # *expand(
+    #     rules.associate__polygenic_risk_score.output,
+    #     phenotype_col=all_phenotypes,
+    #     feature_set=["LOFTEE_pLoF", "AbExp_all_tissues", "max_AbExp", "median_AbExp"],
+    #     covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS"],
+    # )
 ]
 
 rule all:
@@ -102,9 +128,8 @@ rule all:
         rules.merge_phenotype_metadata.output,
         rules.filter_genebass.output,
 #         rules.Index.output, 
-#         expand('/s/project/bayesRare/UKBB_Splicing_Analysis/results/{phenocode}/boxplot.png', phenocode = set(associations.phenocode))
-        *hdl_cholesterol,
-        *hdl_cholesterol_term_pvals,
+        # *hdl_cholesterol,
+        # *hdl_cholesterol_term_pvals,
         *all_phenotypes_output,
         expand(rules.compare_associations.output, comparison=["all"]),
 
