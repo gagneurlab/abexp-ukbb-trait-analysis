@@ -17,7 +17,6 @@
 # %%
 from IPython.display import display
 
-# %%
 import os
 import numpy as np
 import pandas as pd
@@ -29,41 +28,24 @@ import pyspark
 import pyspark.sql.types as t
 import pyspark.sql.functions as f
 
-# import glow
-
-# %%
 import polars as pl
 
-# %%
 import re
 import patsy
 
-# %%
 import plotnine as pn
-# import seaborn as sns
 
 import matplotlib
 import matplotlib.pyplot as plt
 
-# %%
 import lightgbm as lgb
 
 # %%
 # %matplotlib inline
 # %config InlineBackend.figure_format='retina'
 
-# %%
 from rep.notebook_init import setup_plot_style
 setup_plot_style()
-
-# %%
-# import os
-# # os.environ["RAY_ADDRESS"] = os.environ.get("RAY_ADDRESS", 'ray://192.168.16.30:10001')
-# os.environ["RAY_ADDRESS"] = 'ray://192.168.16.28:10001'
-# os.environ["RAY_ADDRESS"]
-
-# %% [raw] {"tags": []}
-#
 
 # %%
 # we need ray to efficiently share the covariates df in memory
@@ -117,15 +99,15 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__polygenic_risk_score',
         default_wildcards={
-            #"phenotype_col": "triglycerides_f30870_0_0",
-            # "phenotype_col": "standing_height_f50_0_0",
-            # "phenotype_col": "body_mass_index_bmi_f21001_0_0",
-            # "phenotype_col": "systolic_blood_pressure_automated_reading_f4080_0_0",
-            "phenotype_col": "HDL_cholesterol",
-            #"phenotype_col": "ldl_direct_f30780_0_0",
-            #"phenotype_col": "LDL_direct",
-            #"phenotype_col": "Asthma",
-            # "feature_set": "LOFTEE_pLoF",
+            #"phenotype_col": "standing_height",
+            #"phenotype_col": "glycated_haemoglobin_hba1c",
+            #"phenotype_col": "Lipoprotein_A",
+            #"phenotype_col": "BodyMassIndex",
+            #"phenotype_col": "Triglycerides",
+            "phenotype_col": "LDL_direct",
+            #"phenotype_col": "systolic_blood_pressure",
+            #"phenotype_col": "HDL_cholesterol",
+            #"feature_set": "LOFTEE_pLoF",
             "feature_set": "AbExp_all_tissues",
             # "feature_set": "LOFTEE_pLoF",
             "covariates": "sex_age_genPC_CLMP_PRS",
@@ -149,6 +131,9 @@ else:
 # %%
 with open(snakemake.input["featureset_config"], "r") as fd:
     config = yaml.safe_load(fd)
+
+# %%
+snakemake.input["featureset_config"]
 
 # %%
 print(json.dumps(config, indent=2, default=str))
@@ -290,9 +275,6 @@ for c in features_df.columns:
 
 renamed_features_df.printSchema()
 
-# %%
-features
-
 # %% [markdown]
 # ### pivot genes
 
@@ -407,7 +389,7 @@ restricted_variables = full_variables[1:34]
 basic_variables = restricted_variables[:-1]
 
 # %%
-abexp_variables = full_variables[35:]
+model_variables = full_variables[35:]
 
 # %% [markdown]
 # # write features
@@ -443,22 +425,17 @@ full_variables = prs_features_pd_df.columns[prs_features_pd_df.nunique() > 1]
 prs_features_pd_df = prs_features_pd_df[full_variables]
 prs_features_pd_df["sex_f31_0_0"] = prs_features_pd_df["sex_f31_0_0"].astype(int)
 
-# %%
-prs_features_pd_df
-
 # %% [markdown]
 # # read samples
 
 # %%
 try:
-    samples = pd.read_parquet(snakemake.input["samples_pq"])
+    samples = pd.read_parquet(f"/s/project/rep/processed/trait_associations_v3/ukbb_wes_200k/associate/{phenotype_col}/cov=sex_age_genPC_CLMP_PRS/train_test_split.parquet")
 except FileNotFoundError:
-    print("Defaulting")
-    samples = pd.read_parquet("'/s/project/rep/processed/trait_associations_v2/ukbb_wes_200k/associate/HDL_cholesterol/cov=sex_age_genPC_CLMP_PRS/samples.parquet'")
+    print("Defaulting on sample reads")
+    samples = pd.read_parquet("/s/project/rep/processed/trait_associations_v2/ukbb_wes_200k/associate/Asthma/cov=sex_age_genPC_CLMP_PRS/train_test_split.parquet")
+samples = samples[["individual", "fold"]]
 samples
-
-# %%
-snakemake.input["samples_pq"]
 
 # %%
 train_samples = samples.loc[samples["fold"] != "test", "individual"].values
@@ -524,88 +501,6 @@ y_test = test_df[phenotype_col]
 # %%
 # Continuous traits:
 
-# %% [raw]
-# ### full model
-
-# %%
-model_pipeline = sklearn.pipeline.Pipeline([
-    ("normalize", sklearn.preprocessing.StandardScaler()),
-    ("linear_model", sklearn.linear_model.ElasticNetCV(cv=cv_split, n_jobs=16)),
-])
-
-# %%
-full_model = model_pipeline.fit(X_train, y_train)
-full_model
-
-# %%
-full_pred_test = full_model.predict(X_test)
-full_pred_test
-
-# %%
-sklearn.metrics.r2_score(y_test, full_pred_test)
-
-
-# %%
-def calculate_r2(x, y):
-    """Calculate the r2 coefficient."""
-    # Calculate means
-    x_mean = x.mean()
-    y_mean = y.mean()
-    
-    # Calculate corr coeff
-    numerator = np.sum((x - x_mean)*(y - y_mean))
-    denominator = ( np.sum((x - x_mean)**2) * np.sum((y - y_mean)**2) )**.5
-    correlation_coef = numerator / denominator
-    
-    return correlation_coef**2
-
-
-# %%
-calculate_r2(y_test, full_pred_test)
-
-# %%
-### restricted model (Without AbExp)
-
-# %%
-model_pipeline_res = sklearn.pipeline.Pipeline([
-    ("normalize", sklearn.preprocessing.StandardScaler()),
-    ("linear_model", sklearn.linear_model.ElasticNetCV(cv=cv_split, n_jobs=16)),
-])
-
-# %%
-restricted_model = model_pipeline_res.fit(X_train[restricted_variables], y_train)
-restricted_model
-
-# %%
-restricted_pred_test = restricted_model.predict(X_test[restricted_variables])
-restricted_pred_test
-
-# %%
-sklearn.metrics.r2_score(y_test, restricted_pred_test)
-
-# %%
-calculate_r2(y_test, restricted_pred_test)
-
-# %%
-### basic model (Without PRS)
-
-# %%
-model_pipeline_basic = sklearn.pipeline.Pipeline([
-    ("normalize", sklearn.preprocessing.StandardScaler()),
-    ("linear_model", sklearn.linear_model.ElasticNetCV(cv=cv_split, n_jobs=16)),
-])
-
-# %%
-basic_model = model_pipeline_basic.fit(X_train[basic_variables], y_train)
-basic_model
-
-# %%
-basic_pred_test = basic_model.predict(X_test[basic_variables])
-basic_pred_test
-
-# %%
-sklearn.metrics.r2_score(y_test, basic_pred_test)
-
 # %%
 ### LGBMR
 
@@ -613,39 +508,41 @@ sklearn.metrics.r2_score(y_test, basic_pred_test)
 gbm_full = lgb.LGBMRegressor()
 gbm_full.fit(X_train, y_train)
 full_pred_test = gbm_full.predict(X_test)
-sklearn.metrics.r2_score(y_test, full_pred_test)
+full_model_r2 = sklearn.metrics.r2_score(y_test, full_pred_test)
+full_model_r2
 
 # %%
 gbm_restricted = lgb.LGBMRegressor()
 gbm_restricted.fit(X_train[restricted_variables], y_train)
 restricted_pred_test = gbm_restricted.predict(X_test[restricted_variables])
-sklearn.metrics.r2_score(y_test, restricted_pred_test)
+restricted_model_r2 = sklearn.metrics.r2_score(y_test, restricted_pred_test)
+restricted_model_r2
 
 # %%
 gbm_basic = lgb.LGBMRegressor()
 gbm_basic.fit(X_train[basic_variables], y_train)
 basic_pred_test = gbm_basic.predict(X_test[basic_variables])
-sklearn.metrics.r2_score(y_test, basic_pred_test)
-
-# %%
-lgb.plot_importance(gbm_full, height=.5, max_num_features=40)
+basic_model_r2 = sklearn.metrics.r2_score(y_test, basic_pred_test)
+basic_model_r2
 
 # %%
 nr_of_quantiles = 10
 
 pred_df = (
-    test_df[["individual", phenotype_col]]
-    .rename(columns={phenotype_col: "measurement"})
+    test_df[["individual", "age_when_attended_assessment_centre_f21003_0_0", "sex_f31_0_0", phenotype_col]]
+    .rename(columns={phenotype_col: "measurement", "age_when_attended_assessment_centre_f21003_0_0" : "age", "sex_f31_0_0": "sex"})
     .assign(**{
         "phenotype_col": phenotype_col,
+        "method": snakemake.wildcards["feature_set"],
         "phenotype_quantile": np.array(pd.qcut(test_df[phenotype_col], nr_of_quantiles, labels=False)),
-        "at_risk": np.array(pd.qcut(test_df[phenotype_col], 10, labels=False)) >= nr_of_quantiles-1,
+        "at_risk": np.array(pd.qcut(test_df[phenotype_col], 10, labels=False)) == 9,
+        "at_risk_low": np.array(pd.qcut(test_df[phenotype_col], 10, labels=False)) == 0,
         "full_model_pred": full_pred_test,
         "full_model_pred_quantile": np.array(pd.qcut(full_pred_test, nr_of_quantiles, labels=False)),
         "restricted_model_pred": restricted_pred_test,
         "restricted_model_pred_quantile": np.array(pd.qcut(restricted_pred_test, nr_of_quantiles, labels=False)),
         "basic_model_pred": basic_pred_test,
-        "basic_model_pred_quantile": np.array(pd.qcut(basic_pred_test, nr_of_quantiles, labels=False)),
+        #"basic_model_pred_quantile": np.array(pd.qcut(basic_pred_test, nr_of_quantiles, labels=False)),
     })
 )
 pred_df
@@ -661,40 +558,133 @@ pred_df = (
         "full_model_pred_rank": pred_df["full_model_pred"].rank(ascending = False),
         "restricted_model_pred_rank": pred_df["restricted_model_pred"].rank(ascending = False),
         "basic_model_pred_rank": pred_df["basic_model_pred"].rank(ascending = False),
+        #"pred_full_at_risk_low": pred_df["full_model_pred_quantile"] < 2,
+        #"pred_restricted_at_risk_low": pred_df["restricted_model_pred_quantile"] < 2
     })
 )
 pred_df
 
 # %%
-# Plot for continuous
+# Save predictions
+pred_df[["individual", "age", "sex", "phenotype_col", "measurement", "method", "basic_model_pred", "restricted_model_pred", "full_model_pred"]].to_parquet(snakemake.output["predictions_pq"], index=False)
+
+# %%
+plot_df = pred_df[["phenotype_col", "measurement", "basic_model_pred", "restricted_model_pred", "full_model_pred"]].rename(columns={
+    "restricted_model_pred": f"Age+Sex+PC+PRS \n r²={restricted_model_r2:.3f}" ,"full_model_pred": f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']} \n r²={full_model_r2:.3f}", "basic_model_pred": f"Age+Sex+PC \n r²={basic_model_r2:.3f}"
+})
+plot_df = plot_df.melt(id_vars=["phenotype_col", "measurement"])
+
+plot = (
+    pn.ggplot(plot_df, pn.aes(y="measurement", x="value"))
+    + pn.ggtitle(f"Predictions of LGBM models for {phenotype_col} ({phenocode})")
+    + pn.geom_bin_2d(bins=100)
+    + pn.geom_smooth(method="lm", color="red")
+    + pn.facet_grid("phenotype_col ~ variable")
+    + pn.scale_fill_continuous(trans = "log10")
+    + pn.theme(figure_size=(12, 4))
+    + pn.theme(title = pn.element_text(va = "top", linespacing = 4))
+    + pn.coord_equal()
+    + pn.labs(
+        x="prediction",
+    )
+)
+
+pn.ggsave(plot = plot, filename = snakemake.output["predictions_plot_png"], dpi=DPI)
+display(plot)
+
+# %%
+# Calc PRC
+prc_df = []
+for model in ["basic", "restricted", "full"]:
+    for extreme in ["bottom", "top"]:
+        for percentile in [0.01 , 0.05, 0.1, 0.2]:
+            if extreme == "top":
+                measurement_quantile = pred_df["measurement"].quantile(1-percentile)
+                prc = sklearn.metrics.precision_recall_curve(pred_df["measurement"].ge(measurement_quantile), pred_df[f"{model}_model_pred"])
+            else:
+                measurement_quantile = pred_df["measurement"].quantile(percentile)
+                prc = sklearn.metrics.precision_recall_curve(~pred_df["measurement"].ge(measurement_quantile), (-1) * pred_df[f"{model}_model_pred"])
+            prc_df.append(pd.DataFrame({"extreme": extreme, "percentile": percentile, "method": model, "precision" : prc[0], "recall" : prc[1], "auPRC": sklearn.metrics.auc(prc[1], prc[0])}))
+prc_df = pd.concat(prc_df)
+prc_df["method"] = prc_df["method"].replace({"basic": "Age+Sex+PC", "restricted": "Age+Sex+PC+PRS", "full": f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}"})
+
+# %%
+# Save prc 
+prc_df.query("method=='Age+Sex+PC' or method=='Age+Sex+PC+PRS'").to_parquet(snakemake.output["precision_recall_baseline_pq"], index=False)
+prc_df.query(f"method=='Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}'").to_parquet(snakemake.output["precision_recall_full_pq"], index=False)
+
+# %%
+prc_df
+
+# %%
+plot = (
+    pn.ggplot(prc_df, pn.aes(x="recall", y="precision", color="method"))
+    + pn.geom_step()
+    + pn.facet_grid("extreme ~ percentile", labeller = 'label_both')
+    + pn.theme(figure_size=(16, 8))
+    + pn.ggtitle(f"Precision-Recall curves of LGBMRegressor models predicting extreme {phenotype_col} ({phenocode})")
+)
+pn.ggsave(plot = plot, filename = snakemake.output["prc_plot_png"], dpi=DPI)
+display(plot)
+
+# %%
+risk_type = "at_risk_low"
+age_data_df = pd.DataFrame({
+    "baseline": pred_df.groupby("age")[risk_type].mean(), 
+    "top_decile_AbExp" : pred_df.query("full_model_pred_quantile==9").groupby("age")[risk_type].mean(),
+    "bottom_decile_AbExp" : pred_df.query("full_model_pred_quantile==0").groupby("age")[risk_type].mean(),
+    "top_decile_PRS" : pred_df.query("restricted_model_pred_quantile==9").groupby("age")[risk_type].mean(),
+    "bottom_decile_PRS" : pred_df.query("restricted_model_pred_quantile==0").groupby("age")[risk_type].mean()
+}).dropna()
+
+# %%
+plot = (pn.ggplot(age_data_df.reset_index(), pn.aes(x='age')) +\
+    pn.geom_line(pn.aes(y='baseline'), color='blue') +\
+    pn.geom_line(pn.aes(y='bottom_decile_AbExp'), color='green') +\
+    pn.geom_line(pn.aes(y='top_decile_AbExp'), color='green') +\
+    pn.geom_line(pn.aes(y='bottom_decile_PRS'), color='red') +\
+    pn.geom_line(pn.aes(y='top_decile_PRS'), color='red')
+)
+display(plot)
+
+# %% [markdown]
+# ## Testing
+
+# %%
+ax = lgb.plot_importance(gbm_full, height=.5, max_num_features=40, title=f"Feature importance in LGBM model predicting {phenotype_col} (top 40 features)")
+ax.figure.savefig(f"../../plots/{phenotype_col}/LGBM_feature_importance.png")
 
 # %%
 ax = pd.DataFrame({"sex+age+PC": pred_df.groupby("basic_model_pred_quantile")["phenotype_quantile"].mean(),"+PRS": pred_df.groupby("restricted_model_pred_quantile")["phenotype_quantile"].mean(), "+AbExpAllTissuesForSignificantGenes": pred_df.groupby("full_model_pred_quantile")["phenotype_quantile"].mean()}).plot()
 ax.set_ylabel("Measurement mean decile")
 ax.set_xlabel("Prediction decile")
+ax.figure.savefig(f"../../plots/{phenotype_col}/LGBM_mean_measurement_decile_by_prediction_decile.png")
 
 # %%
-ax = pd.DataFrame({"sex+age+PC": pred_df.groupby("phenotype_quantile").apply(lambda decile: calculate_r2(decile["measurement"],decile["basic_model_pred"])),"+PRS": pred_df.groupby("phenotype_quantile").apply(lambda decile: calculate_r2(decile["measurement"],decile["restricted_model_pred"])),"+AbExpAllTissuesForSignificantGenes": pred_df.groupby("phenotype_quantile").apply(lambda decile: calculate_r2(decile["measurement"],decile["full_model_pred"]))}).plot()
+ax = pd.DataFrame({"sex+age+PC": pred_df.groupby("phenotype_quantile").apply(lambda decile: calculate_r2(decile["measurement"],decile["basic_model_pred"])),"+PRS": pred_df.groupby("phenotype_quantile").apply(lambda decile: calculate_r2(decile["measurement"],decile["restricted_model_pred"])),"+PRS+AbExpAllTissuesForSignificantGenes": pred_df.groupby("phenotype_quantile").apply(lambda decile: calculate_r2(decile["measurement"],decile["full_model_pred"])), "+PRS+Loftee": pred_df.groupby("phenotype_quantile").apply(lambda decile: calculate_r2(decile["measurement"],decile["loftee_model_pred"]))}).plot()
 ax.set_xlabel(f"{phenotype_col} measurement decile")
 ax.set_ylabel("r^2")
+#ax.figure.savefig(f"../../plots/{phenotype_col}/LGBM_r2_by_measurement_decile.png")
 
 # %%
 ax = pd.DataFrame({"sex+age+PC": pred_df.groupby("phenotype_quantile").apply(lambda decile: sklearn.metrics.mean_squared_error(decile["measurement"],decile["basic_model_pred"])),"+PRS": pred_df.groupby("phenotype_quantile").apply(lambda decile: sklearn.metrics.mean_squared_error(decile["measurement"],decile["restricted_model_pred"])),"+AbExpAllTissuesForSignificantGenes": pred_df.groupby("phenotype_quantile").apply(lambda decile: sklearn.metrics.mean_squared_error(decile["measurement"],decile["full_model_pred"]))}).plot()
 ax.set_xlabel(f"{phenotype_col} measurement decile")
 ax.set_ylabel("MSE")
+#ax.figure.savefig(f"../../plots/{phenotype_col}/LGBM_MSE_by_measurement_decile.png")
 
 # %%
-ax = pd.DataFrame({"sex+age+PC": pred_df.groupby("phenotype_quantile").apply(lambda decile: (decile["phenotype_quantile"]==decile["basic_model_pred_quantile"]).mean()),"+PRS": pred_df.groupby("phenotype_quantile").apply(lambda decile: (decile["phenotype_quantile"]==decile["restricted_model_pred_quantile"]).mean()),"+AbExpAllTissuesForSignificantGenes": pred_df.groupby("phenotype_quantile").apply(lambda decile: (decile["phenotype_quantile"]==decile["full_model_pred_quantile"]).mean())}).plot()
+ax = pd.DataFrame({"sex+age+PC": pred_df.groupby("phenotype_quantile").apply(lambda decile: (decile["phenotype_quantile"]==decile["basic_model_pred_quantile"]).mean()),"+PRS": pred_df.groupby("phenotype_quantile").apply(lambda decile: (decile["phenotype_quantile"]==decile["restricted_model_pred_quantile"]).mean()),"+AbExpAllTissuesForSignificantGenes": pred_df.groupby("phenotype_quantile").apply(lambda decile: (decile["phenotype_quantile"]==decile["full_model_pred_quantile"]).mean()), "+Loftee": pred_df.groupby("phenotype_quantile").apply(lambda decile: (decile["phenotype_quantile"]==decile["loftee_model_pred_quantile"]).mean())}).plot()
 ax.set_xlabel("measurement decile")
 ax.set_ylabel("prediction decile match")
+ax.figure.savefig(f"../../plots/{phenotype_col}/LGBM_prediction_decile_accuracy_by_measurement_decile.png")
 
 # %%
-models = ["full", "restricted", "basic"]
+models = ["loftee", "full", "restricted", "basic"]
 odd_ratios = {model: {} for model in models}
 for model in models:
-    for q in np.logspace(np.log10(10), np.log10(10000), num=50):
-        top_samples = pred_df.query(f"{model}_model_pred_rank<{q}")
-        bottom_samples = pred_df.query(f"{model}_model_pred_rank>={q}")
+    for q in np.logspace(np.log10(50), np.log10(10000), num=50):
+        top_samples = pred_df.query(f"{model}_model_pred_rank<={q}")
+        bottom_samples = pred_df.query(f"{model}_model_pred_rank>{q}")
         
         #Version1:
         #odd_ratios[model][q] = (top_samples["at_risk"].mean()) / ((bottom_samples["at_risk"]).mean())
@@ -714,6 +704,7 @@ fig1, ax1 = plt.subplots()
 ax1.plot(odd_ratios["basic"], label="Age+Sex+PC")
 ax1.plot(odd_ratios["restricted"], label="+PRS")
 ax1.plot(odd_ratios["full"], label="+AbExpSignificantGenesAllTissues")
+ax1.plot(odd_ratios["loftee"], label="+Loftee")
 plt.legend()
 ax1.set_xscale('log')
 ax1.invert_xaxis()
@@ -721,6 +712,7 @@ plt.xlabel("Top n Samples by prediction")
 plt.ylabel("Odds ratio")
 plt.title(f"Models predicting {phenotype_col} - Test for measurement in top decile")
 ax1.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+ax1.figure.savefig(f"../../plots/{phenotype_col}/LGBM_OddsRatio_Top_Decile_Test.png")
 
 # %%
 model_discrepency_df = pred_df.query("abs_diff_full_restricted_pred>1")
@@ -731,6 +723,9 @@ sklearn.metrics.mean_squared_error(model_discrepency_df["measurement"], model_di
 
 # %%
 # Binary traits:
+
+# %%
+y_train
 
 # %%
 model_pipeline = sklearn.pipeline.Pipeline([
@@ -811,19 +806,51 @@ basic_model.score(X_test[basic_variables], y_test)
 sklearn.metrics.confusion_matrix(y_test, basic_pred_test)
 
 # %%
-fpr_full, tpr_full, _ = sklearn.metrics.roc_curve(y_test,  full_pred_prob_test)
-auc_full = sklearn.metrics.roc_auc_score(y_test, full_pred_prob_test)
+y_train_binary = pd.qcut(y_train, 100, labels=False)>=5
+y_test_binary = pd.qcut(y_test, 100, labels=False)>=5
 
-fpr_res, tpr_res, _ = sklearn.metrics.roc_curve(y_test,  restricted_pred_prob_test)
-auc_res = sklearn.metrics.roc_auc_score(y_test, restricted_pred_prob_test)
+# %%
+gbm_classifier_full = lgb.LGBMClassifier()
+gbm_classifier_full.fit(X_train[[c for c in X_train.columns if "@pLof" not in c]], y_train_binary)
+full_pred_prob_test = gbm_classifier_full.predict_proba(X_test[[c for c in X_train.columns if "@pLof" not in c]])[::,1]
+gbm_classifier_full.score(X_test[[c for c in X_train.columns if "@pLof" not in c]], y_test_binary)
 
-fpr_basic, tpr_basic, _ = sklearn.metrics.roc_curve(y_test,  basic_pred_prob_test)
-auc_basic = sklearn.metrics.roc_auc_score(y_test, basic_pred_prob_test)
+# %%
+gbm_classifier_loftee = lgb.LGBMClassifier()
+gbm_classifier_loftee.fit(X_train[[c for c in X_train.columns if "@AbExp" not in c]], y_train_binary)
+loftee_pred_prob_test = gbm_classifier_loftee.predict_proba(X_test[[c for c in X_train.columns if "@AbExp" not in c]])[::,1]
+gbm_classifier_loftee.score(X_test[[c for c in X_train.columns if "@AbExp" not in c]], y_test_binary)
+
+# %%
+gbm_classifier_restricted = lgb.LGBMClassifier()
+gbm_classifier_restricted.fit(X_train[restricted_variables], y_train_binary)
+restricted_pred_prob_test = gbm_classifier_restricted.predict_proba(X_test[restricted_variables])[::,1]
+gbm_classifier_restricted.score(X_test[restricted_variables], y_test_binary)
+
+# %%
+gbm_classifier_basic = lgb.LGBMClassifier()
+gbm_classifier_basic.fit(X_train[basic_variables], y_train_binary)
+basic_pred_prob_test = gbm_classifier_basic.predict_proba(X_test[basic_variables])[::,1]
+gbm_classifier_basic.score(X_test[basic_variables], y_test_binary)
+
+# %%
+fpr_full, tpr_full, _ = sklearn.metrics.roc_curve(y_test_binary,  full_pred_prob_test)
+auc_full = sklearn.metrics.roc_auc_score(y_test_binary, full_pred_prob_test)
+
+fpr_loftee, tpr_loftee, _ = sklearn.metrics.roc_curve(y_test_binary,  loftee_pred_prob_test)
+auc_loftee = sklearn.metrics.roc_auc_score(y_test_binary, loftee_pred_prob_test)
+
+fpr_res, tpr_res, _ = sklearn.metrics.roc_curve(y_test_binary,  restricted_pred_prob_test)
+auc_res = sklearn.metrics.roc_auc_score(y_test_binary, restricted_pred_prob_test)
+
+fpr_basic, tpr_basic, _ = sklearn.metrics.roc_curve(y_test_binary,  basic_pred_prob_test)
+auc_basic = sklearn.metrics.roc_auc_score(y_test_binary, basic_pred_prob_test)
 
 #create ROC curve
 plt.plot(fpr_basic,tpr_basic,label="Age+Sex+PC: AUC="+str(auc_basic))
 plt.plot(fpr_res,tpr_res,label="+PRS: AUC="+str(auc_res))
-plt.plot(fpr_full,tpr_full,label="+AbExp: AUC="+str(auc_full))
+plt.plot(fpr_loftee,tpr_loftee,label="+PRS+Loftee: AUC="+str(auc_loftee))
+plt.plot(fpr_full,tpr_full,label="+PRS+AbExp: AUC="+str(auc_full))
 plt.ylabel('True Positive Rate')
 plt.xlabel('False Positive Rate')
 plt.legend(loc=4)
@@ -831,13 +858,14 @@ plt.show()
 
 # %%
 fig, ax = plt.subplots()
-sklearn.metrics.PrecisionRecallDisplay.from_predictions(y_test, basic_pred_prob_test, name="Age+Sex+PC:" ,ax=ax)
-sklearn.metrics.PrecisionRecallDisplay.from_predictions(y_test, restricted_pred_prob_test, name="+PRS:", ax=ax)
-sklearn.metrics.PrecisionRecallDisplay.from_predictions(y_test, full_pred_prob_test, name="+AbExpAllTissuesForSignificantGenes:",ax=ax)
-#sklearn.metrics.PrecisionRecallDisplay.from_predictions(y_test, full_b_pred_prob_test, ax=ax)
-plt.title(f"Precision-Recall curves of Logistic Regression models predicting {phenotype_col} ({phenocode})")
+sklearn.metrics.PrecisionRecallDisplay.from_predictions(y_test_binary, pred_df["basic_model_pred"], name="Age+Sex+PC:" ,ax=ax)
+sklearn.metrics.PrecisionRecallDisplay.from_predictions(y_test_binary, pred_df["restricted_model_pred"], name="+PRS:", ax=ax)
+sklearn.metrics.PrecisionRecallDisplay.from_predictions(y_test_binary, pred_df["loftee_model_pred"], name="+PRS+Loftee:",ax=ax)
+sklearn.metrics.PrecisionRecallDisplay.from_predictions(y_test_binary, pred_df["full_model_pred"], name="+PRS+AbExpAllTissuesForSignificantGenes:",ax=ax)
+
+plt.title(f"Precision-Recall curves of LGBMRegressor models predicting extreme {phenotype_col} ({phenocode})")
 plt.xlabel("Recall")
-plt.ylabel("precision")
+plt.ylabel("Precision")
 plt.legend(loc=1)
 plt.show()
 
@@ -905,11 +933,14 @@ full_params_df.to_parquet(snakemake.output["full_params_pq"], index=False)
 # ## phenotype correlation
 
 # %%
-plot_df = pred_df[["phenotype_col", "measurement", "full_model_pred", "restricted_model_pred"]]
+plot_df = pred_df[["phenotype_col", "measurement", "restricted_model_pred", "full_model_pred", "loftee_model_pred"]].rename(columns={
+    "restricted_model_pred": f"PRS r²={restricted_model_r2:.3f}" ,"full_model_pred": f"PRS+AbExp r²={full_model_r2:.3f}", "loftee_model_pred": f"PRS+Loftee r²={loftee_model_r2:.3f}"
+})
 plot_df = plot_df.melt(id_vars=["phenotype_col", "measurement"])
 
 plot = (
     pn.ggplot(plot_df, pn.aes(y="measurement", x="value"))
+    + pn.ggtitle(f"Predictions for {phenotype_col} of models on PRS, PRS + AbExp and PRS + Loftee")
     + pn.geom_bin_2d(bins=100)
     + pn.geom_smooth(method="lm", color="red")
     + pn.facet_grid("phenotype_col ~ variable")
@@ -919,6 +950,8 @@ plot = (
         x="prediction",
     )
 )
+
+pn.ggsave(plot = plot, filename = f"../../plots/{phenotype_col}/LGBM_Scatter_PRS_and_PRS+AbExp.png", dpi=DPI)
 display(plot)
 
 # %%
@@ -936,9 +969,50 @@ plot = (
     #    x="prediction",
     #)
 )
+pn.ggsave(plot = plot, filename = f"../../plots/{phenotype_col}/LGBM_Scatter_PRS_vs_PRS+AbExp.png", dpi=DPI)
 display(plot)
 
 # %%
+plot_df = pred_df[["loftee_model_pred", "restricted_model_pred"]].rename(columns = {"loftee_model_pred": "+loftee (prediction)", "restricted_model_pred": "PRS (prediction)"})
+
+plot = (
+    pn.ggplot(plot_df, pn.aes(y="+loftee (prediction)", x="PRS (prediction)"))
+    + pn.ggtitle(f"Predictions for {phenotype_col} of models on PRS vs. PRS + Loftee")
+    + pn.geom_bin_2d(bins=100)
+    + pn.geom_smooth(method="lm", color="red")
+    #+ pn.facet_grid("phenotype_col ~ variable")
+    + pn.scale_fill_continuous(trans = "log10")
+    #+ pn.coord_equal()
+    #+ pn.labs(
+    #    x="prediction",
+    #)
+)
+pn.ggsave(plot = plot, filename = f"../../plots/{phenotype_col}/LGBM_Scatter_PRS_vs_PRS+Loftee.png", dpi=DPI)
+display(plot)
+
+# %%
+plot_df = pred_df[["loftee_model_pred", "full_model_pred"]].rename(columns = {"loftee_model_pred": "PRS+loftee (prediction)", "full_model_pred": "PRS+AbExp (prediction)"})
+
+plot = (
+    pn.ggplot(plot_df, pn.aes(y="PRS+loftee (prediction)", x="PRS+AbExp (prediction)"))
+    + pn.ggtitle(f"Predictions for {phenotype_col} of models on PRS + AbExp vs. PRS + Loftee")
+    + pn.geom_bin_2d(bins=100)
+    + pn.geom_smooth(method="lm", color="red")
+    #+ pn.facet_grid("phenotype_col ~ variable")
+    + pn.scale_fill_continuous(trans = "log10")
+    #+ pn.coord_equal()
+    #+ pn.labs(
+    #    x="prediction",
+    #)
+)
+pn.ggsave(plot = plot, filename = f"../../plots/{phenotype_col}/LGBM_Scatter_PRS+AbExp_vs_PRS+Loftee.png", dpi=DPI)
+display(plot)
+
+# %%
+test_df
+
+# %%
+abexp_variables = [c for c in test_df.columns if "@AbExp" in c]
 plot_df = test_df[[c for c in test_df.columns if c in ["individual"]+abexp_variables]]
 plot_df = pd.melt(plot_df, id_vars=["individual"], value_vars=list(set(abexp_variables).intersection(set(plot_df.columns)))).rename(columns={"value": "score"})
 plot_df[["gene_id", "score_type"]] = plot_df["variable"].str.split("@",expand=True)
@@ -967,8 +1041,10 @@ plot = (
     + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
     + pn.facet_grid("gene_symbol ~ score_type", scales="free_x")
     + pn.theme(aspect_ratio=1/2)
-    #+ pn.ggtitle(f"Residuals of common PRS and {phenotype_col} vs. AbExpMax")
+    + pn.ggtitle(f"Residuals of common PRS and {phenotype_col} vs. AbExpMax")
+    + pn.theme(title = pn.element_text(va = "top", linespacing = 8))
 )
+pn.ggsave(plot = plot, filename = f"../../plots/{phenotype_col}/LGBM_PRS_residuals_vs_AbExpMax.png", dpi=DPI)
 plot
 
 # %%
