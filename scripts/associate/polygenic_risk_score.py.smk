@@ -16,17 +16,21 @@ rule associate__polygenic_risk_score:
         ntasks=1,
         mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
     output:
-        prs_features_pq=directory(f"{OUTPUT_BASEPATH}/prs_features.parquet"),
+        #prs_features_pq=directory(f"{OUTPUT_BASEPATH}/prs_features.parquet"),
         predictions_pq=f"{OUTPUT_BASEPATH}/predictions.parquet",
+        precision_recall_baseline_pq=f"{OUTPUT_BASEPATH}/precision_recall.baseline.parquet",
+        precision_recall_full_pq=f"{OUTPUT_BASEPATH}/precision_recall.full.parquet",
+        prc_plot_png = f"{OUTPUT_BASEPATH}/precision_recall_plot.png",
+        predictions_plot_png = f"{OUTPUT_BASEPATH}/predictions_plot.png",
         # stats_pq=f"{OUTPUT_BASEPATH}/stats.parquet",
-        restricted_summary_txt=f"{OUTPUT_BASEPATH}/restricted_model.summary.txt",
-        full_summary_txt=f"{OUTPUT_BASEPATH}/full_model.summary.txt",
-        restricted_params_pq=f"{OUTPUT_BASEPATH}/restricted_model.params.parquet",
-        full_params_pq=f"{OUTPUT_BASEPATH}/full_model.params.parquet",
+        # restricted_summary_txt=f"{OUTPUT_BASEPATH}/restricted_model.summary.txt",
+        # full_summary_txt=f"{OUTPUT_BASEPATH}/full_model.summary.txt",
+        # restricted_params_pq=f"{OUTPUT_BASEPATH}/restricted_model.params.parquet",
+        # full_params_pq=f"{OUTPUT_BASEPATH}/full_model.params.parquet",
         # pickling not working bc of patsy formula
         # restricted_model=f"{OUTPUT_BASEPATH}/restricted_model.pickle",
         # full_model=f"{OUTPUT_BASEPATH}/full_model.pickle",
-        touch_file=touch(f"{OUTPUT_BASEPATH}/done"),
+        # touch_file=touch(f"{OUTPUT_BASEPATH}/done"),
     input:
         # protein_coding_genes_pq=config["protein_coding_genes_pq"],
         associations_pq=f"{ASSOCIATION_BASEPATH}/associations.parquet",
