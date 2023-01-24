@@ -69,13 +69,16 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__compare_genebass',
         default_wildcards={
-            "phenotype_col": "severe_LDL",
+            # "phenotype_col": "Asthma",
+            # "phenotype_col": "severe_LDL",
             # "phenotype_col": "triglycerides_f30870_0_0",
             #"phenotype_col": "hdl_cholesterol_f30760_0_0",
+            "phenotype_col": "HDL_cholesterol",
             "feature_set": "LOFTEE_pLoF",
             # "feature_set": "AbExp_all_tissues",
-            "covariates": "sex_age_genPC",
-            # "covariates": "sex_age_genPC_CLMP_PRS",
+            # "feature_set": "max_AbExp",
+            # "covariates": "sex_age_genPC",
+            "covariates": "sex_age_genPC_CLMP_PRS",
         }
     )
 
@@ -144,6 +147,22 @@ print(f"Corrected for {regression_results_df.shape[0]} association tests...")
 display(regression_results_df)
 
 # %%
+regression_results_df.filter(pl.col("lr_stat") < -300)["gene"].to_pandas()
+
+# %%
+did_not_converge = (
+    pl.scan_parquet(snakemake.input["associations_pq"] + "/*.parquet")
+    .filter(
+        (~ pl.col("restricted_model_converged")) | (~ pl.col("full_model_converged"))
+    )
+    .collect()
+)
+did_not_converge
+
+# %%
+did_not_converge["gene"].to_list()
+
+# %%
 regression_results_df["padj"].to_pandas().quantile(q=[0.5, 0.05, 0.001])
 
 # %%
@@ -153,17 +172,10 @@ regression_results_df["padj"].to_pandas().quantile(q=[0.5, 0.05, 0.001])
 # regression_results_df[regression_results_df["padj"] < 0.05]
 
 # %% {"tags": []}
-genebass_df = (
-    pl.scan_parquet(snakemake.input["genebass_pq"] + "/*.parquet")
+genebass_300k_df = (
+    pl.scan_parquet(snakemake.input["genebass_300k_pq"] + "/*.parquet")
     .filter(pl.col("annotation") == pl.lit("pLoF"))
     .filter(pl.col("phenocode") == pl.lit(phenocode))
-    # .collect()
-)
-genebass_df.schema
-
-# %%
-genebass_df = (
-    genebass_df
     .rename({
         "gene_id": "gene",
         "Pvalue": "lr_pval",
@@ -172,12 +184,32 @@ genebass_df = (
         pl.col("lr_pval") * pl.count(),
         1.0,
     ]).alias("padj"))
+    .collect()
 )
-genebass_df.schema
+genebass_300k_df.schema
 
 # %%
-genebass_df = genebass_df.collect()
-genebass_df
+genebass_300k_df
+
+# %% {"tags": []}
+genebass_500k_df = (
+    pl.scan_parquet(snakemake.input["genebass_500k_pq"] + "/*.parquet")
+    .filter(pl.col("annotation") == pl.lit("pLoF"))
+    .filter(pl.col("phenocode") == pl.lit(phenocode))
+    .rename({
+        "gene_id": "gene",
+        "Pvalue": "lr_pval",
+    })
+    .with_column(pl.min([
+        pl.col("lr_pval") * pl.count(),
+        1.0,
+    ]).alias("padj"))
+    .collect()
+)
+genebass_500k_df.schema
+
+# %%
+genebass_500k_df
 
 # %%
 # adj_joint_regression_results_df = (
@@ -200,7 +232,8 @@ genebass_df
 # %%
 combined_regression_results_df = pd.concat([
     regression_results_df.with_column(pl.lit(snakemake.wildcards["feature_set"]).alias("score_type")).to_pandas(),
-    genebass_df.with_column(pl.lit("Genebass").alias("score_type")).to_pandas(),
+    genebass_300k_df.with_column(pl.lit("Genebass (300k WES)").alias("score_type")).to_pandas(),
+    genebass_500k_df.with_column(pl.lit("Genebass (500k WES)").alias("score_type")).to_pandas(),
 ], join="inner")
 
 combined_regression_results_df = (
@@ -216,6 +249,7 @@ combined_regression_results_df = (
 )
 combined_regression_results_df
 
+
 # %% [markdown]
 # ## Plot
 
@@ -223,66 +257,103 @@ combined_regression_results_df
 # ## full plot
 
 # %%
-plot_df = combined_regression_results_df
+def plot_pvalues(plot_df, x, y, cutoff=0.05, crop_pvalue=10**-150):
+    plot_df = (
+        plot_df
+        .assign(**{
+            x: (np.fmax(crop_pvalue, plot_df[x].fillna(1))),
+            y: (np.fmax(crop_pvalue, plot_df[y].fillna(1))),
+        })
+        #.loc[(combined_regression_results_df[x] < cutoff) | (combined_regression_results_df[y] < cutoff), [x, y]]
+    )
 
-x="Genebass"
-y=snakemake.wildcards["feature_set"]
+    counts_x = (plot_df[x] < cutoff).sum()
+    counts_y = (plot_df[y] < cutoff).sum()
 
-cutoff = 0.05
-crop_pvalue = 10 ** -150
-
-plot_df = (
-    plot_df
-    .assign(**{
-        x: np.fmax(crop_pvalue, plot_df[x].fillna(1)),
-        y: np.fmax(crop_pvalue, plot_df[y].fillna(1)),
-    })
-    #.loc[(combined_regression_results_df[x] < cutoff) | (combined_regression_results_df[y] < cutoff), [x, y]]
-)
-
-counts_x = (plot_df[x] < cutoff).sum()
-counts_y = (plot_df[y] < cutoff).sum()
-
-min_pval = min(
-    plot_df[x].min(),
-    plot_df[y].min(),
-)
-
-plot = (
-    pn.ggplot(plot_df, pn.aes(x=x, y=y))
-    + pn.geom_abline(slope=1, color="black", linetype="dashed")
-    + pn.geom_hline(yintercept=0.05, color="red", linetype="dashed")
-    + pn.geom_vline(xintercept=0.05, color="red", linetype="dashed")
-    # + pn.geom_rect(
-    #     xmax=1,
-    #     xmin=0.05,
-    #     ymax=1,
-    #     ymin=0.05,
-    #     color="red", 
-    #     linetype="dashed"
+    # min_pval = min(
+    #     plot_df[x].min(),
+    #     plot_df[y].min(),
     # )
-    + pn.geom_point()
-    #+ pn.coord_fixed()
-    + pn.scale_x_log10(limits=(min_pval, 1))
-    + pn.scale_y_log10(limits=(min_pval, 1))
-    + pn.labs(
-        title=f"Association between genes and '{phenotype_col}'\n(p-values, alpha={cutoff})",
-        x=f"{x}\n(n_signif={counts_x})",
-        y=f"{y}\n(n_signif={counts_y})",
+
+    plot_df = (
+        plot_df
+        .assign(**{
+            x: -np.log10(plot_df[x]),
+            y: -np.log10(plot_df[y]),
+        })
+        #.loc[(combined_regression_results_df[x] < cutoff) | (combined_regression_results_df[y] < cutoff), [x, y]]
     )
-    + pn.theme(
-        # axis_text_x=pn.element_text(rotation=90),
-        # figure_size=(8, 8),
-        title=pn.element_text(linespacing=1.4),
+    max_logpval = max(
+        plot_df[x].max(),
+        plot_df[y].max(),
     )
-    # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
+
+    plot = (
+        pn.ggplot(plot_df, pn.aes(x=x, y=y))
+        + pn.geom_abline(slope=1, color="black", linetype="dashed")
+        + pn.geom_hline(yintercept=0.05, color="red", linetype="dashed")
+        + pn.geom_vline(xintercept=0.05, color="red", linetype="dashed")
+        # + pn.geom_rect(
+        #     xmax=1,
+        #     xmin=0.05,
+        #     ymax=1,
+        #     ymin=0.05,
+        #     color="red", 
+        #     linetype="dashed"
+        # )
+        + pn.geom_point()
+        #+ pn.coord_fixed()
+        # + pn.facet_grid("~ Genebass_version")
+        # + pn.scale_x_log10(limits=(min_pval, 1))
+        # + pn.scale_y_log10(limits=(min_pval, 1))
+        + pn.scale_x_continuous(limits=(0, max_logpval))
+        + pn.scale_y_continuous(limits=(0, max_logpval))
+        + pn.labs(
+            title=f"Association between genes and '{phenotype_col}'\n(p-values, alpha={cutoff})",
+            x=f"-log10('{x}' p-value)\n(n_signif={counts_x})",
+            y=f"-log10('{y}' p-value)\n(n_signif={counts_y})",
+        )
+        + pn.theme(
+            # axis_text_x=pn.element_text(rotation=90),
+            # figure_size=(8, 8),
+            title=pn.element_text(linespacing=1.4),
+        )
+        # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
+    )
+    return plot_df, plot
+
+
+# %%
+plot_df, plot = plot_pvalues(
+    combined_regression_results_df,
+    x = "Genebass (300k WES)",
+    y = snakemake.wildcards["feature_set"],
+    cutoff = 0.05,
+    crop_pvalue = 10 ** -150,
 )
 
 # %%
-display(plot)
+plot
 
 # %%
-path = snakemake.params["output_basedir"] + "/pvalue_comp"
+path = snakemake.params["output_basedir"] + "/pvalue_comp.Genebass_300k"
+pn.ggsave(plot, path + ".png", dpi=DPI)
+pn.ggsave(plot, path + ".pdf", dpi=DPI)
+
+# %%
+plot_df, plot = plot_pvalues(
+    combined_regression_results_df,
+    x = "Genebass (500k WES)",
+    y = snakemake.wildcards["feature_set"],
+    cutoff = 0.05,
+    crop_pvalue = 10 ** -150,
+)
+
+# %%
+plot
+
+# %%
+path = snakemake.params["output_basedir"] + "/pvalue_comp.Genebass_500k"
 pn.ggsave(plot, path + ".png", dpi=DPI)
 pn.ggsave(plot, path + ".pdf", dpi=DPI)
 
@@ -290,66 +361,36 @@ pn.ggsave(plot, path + ".pdf", dpi=DPI)
 # ## cropped plot
 
 # %%
-plot_df = combined_regression_results_df
-
-x="Genebass"
-y=snakemake.wildcards["feature_set"]
-
-cutoff = 0.05
-crop_pvalue = 10 ** -10
-
-plot_df = (
-    plot_df
-    .assign(**{
-        x: np.fmax(crop_pvalue, plot_df[x].fillna(1)),
-        y: np.fmax(crop_pvalue, plot_df[y].fillna(1)),
-    })
-    #.loc[(combined_regression_results_df[x] < cutoff) | (combined_regression_results_df[y] < cutoff), [x, y]]
-)
-
-counts_x = (plot_df[x] < cutoff).sum()
-counts_y = (plot_df[y] < cutoff).sum()
-
-min_pval = min(
-    plot_df[x].min(),
-    plot_df[y].min(),
-)
-
-plot = (
-    pn.ggplot(plot_df, pn.aes(x=x, y=y))
-    + pn.geom_abline(slope=1, color="black", linetype="dashed")
-    + pn.geom_hline(yintercept=0.05, color="red", linetype="dashed")
-    + pn.geom_vline(xintercept=0.05, color="red", linetype="dashed")
-    # + pn.geom_rect(
-    #     xmax=1,
-    #     xmin=0.05,
-    #     ymax=1,
-    #     ymin=0.05,
-    #     color="red", 
-    #     linetype="dashed"
-    # )
-    + pn.geom_point()
-    #+ pn.coord_fixed()
-    + pn.scale_x_log10(limits=(min_pval, 1))
-    + pn.scale_y_log10(limits=(min_pval, 1))
-    + pn.labs(
-        title=f"Association between genes and '{phenotype_col}'\n(p-values, alpha={cutoff})",
-        x=f"{x}\n(n_signif={counts_x})",
-        y=f"{y}\n(n_signif={counts_y})",
-    )
-    + pn.theme(
-        # axis_text_x=pn.element_text(rotation=90),
-        # figure_size=(8, 8),
-        title=pn.element_text(linespacing=1.4),
-    )
-    # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
+plot_df, plot = plot_pvalues(
+    combined_regression_results_df,
+    x = "Genebass (300k WES)",
+    y = snakemake.wildcards["feature_set"],
+    cutoff = 0.05,
+    crop_pvalue = 10 ** -10,
 )
 
 # %%
-display(plot)
+plot
 
 # %%
-path = snakemake.params["output_basedir"] + "/pvalue_comp_cropped"
+path = snakemake.params["output_basedir"] + "/pvalue_comp_cropped.Genebass_300k"
+pn.ggsave(plot, path + ".png", dpi=DPI)
+pn.ggsave(plot, path + ".pdf", dpi=DPI)
+
+# %%
+plot_df, plot = plot_pvalues(
+    combined_regression_results_df,
+    x = "Genebass (500k WES)",
+    y = snakemake.wildcards["feature_set"],
+    cutoff = 0.05,
+    crop_pvalue = 10 ** -10,
+)
+
+# %%
+plot
+
+# %%
+path = snakemake.params["output_basedir"] + "/pvalue_comp_cropped.Genebass_500k"
 pn.ggsave(plot, path + ".png", dpi=DPI)
 pn.ggsave(plot, path + ".pdf", dpi=DPI)
 
@@ -357,15 +398,14 @@ pn.ggsave(plot, path + ".pdf", dpi=DPI)
 # ## Venn diagram
 
 # %%
-
-# %%
 fig, ax = plt.subplots()
-matplotlib_venn.venn2(
+matplotlib_venn.venn3(
     (
-        set(combined_regression_results_df[combined_regression_results_df[x] < cutoff].index.get_level_values("gene")),
         set(combined_regression_results_df[combined_regression_results_df[y] < cutoff].index.get_level_values("gene")),
+        set(combined_regression_results_df[combined_regression_results_df["Genebass (300k WES)"] < cutoff].index.get_level_values("gene")),
+        set(combined_regression_results_df[combined_regression_results_df["Genebass (500k WES)"] < cutoff].index.get_level_values("gene")),
     ),
-    set_labels = (x, y),
+    set_labels = (y, "Genebass (300k WES)", "Genebass (500k WES)"),
     ax=ax
 )
 display(ax)
@@ -389,16 +429,19 @@ fig.savefig(path + ".pdf", dpi=DPI)
 significant_genes = (
     combined_regression_results_df
     .assign(**{
-        f"{x}_signif": (combined_regression_results_df[x] < cutoff),
+        "Genebass_300k_signif": (combined_regression_results_df["Genebass (300k WES)"] < cutoff),
+        "Genebass_500k_signif": (combined_regression_results_df["Genebass (500k WES)"] < cutoff),
         f"{y}_signif": (combined_regression_results_df[y] < cutoff),
     })
-    .query(f"{x}_signif | {y}_signif")
+    .query(f"Genebass_300k_signif | Genebass_500k_signif | {y}_signif")
     # .query(f"{y}_signif")
     .loc[:, [
         y,
         f"{y}_signif",
-        x,
-        f"{x}_signif",
+        "Genebass (300k WES)",
+        "Genebass_300k_signif",
+        "Genebass (500k WES)",
+        "Genebass_500k_signif",
     ]]
     .sort_values(y)
 )
@@ -422,7 +465,12 @@ stats_df = (
         'lr_pval',
         'padj',
     ]]
-    .join(significant_genes[["Genebass", "Genebass_signif"]], how="right")
+    .join(significant_genes[[
+        "Genebass (300k WES)",
+        "Genebass_300k_signif",
+        "Genebass (500k WES)",
+        "Genebass_500k_signif",
+    ]], how="right")
     .sort_values("padj")
 )
 

@@ -126,7 +126,7 @@ rule all:
     input:
         expand(rules.read_phenotypes.output, zip, pheno_dir=phenotype_dirs, ukbb_code=ukbb_codes),
         rules.merge_phenotype_metadata.output,
-        rules.filter_genebass.output,
+        expand(rules.filter_genebass.output, genebass_version=["300k", "500k"]),
 #         rules.Index.output, 
         # *hdl_cholesterol,
         # *hdl_cholesterol_term_pvals,

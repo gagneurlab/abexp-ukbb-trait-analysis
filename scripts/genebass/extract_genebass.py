@@ -12,7 +12,10 @@ if MEM.startswith("unlimited"):
     print("Memory not constrained, using all available memory...")
     import psutil
     MEM = psutil.virtual_memory().available / 1024
+else:
+    MEM = float(MEM)
 
+print(MEM)
 # reduce driver memory to 80% of available memory and convert to integer
 MEM = int(MEM * 0.8)
 

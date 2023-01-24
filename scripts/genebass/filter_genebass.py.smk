@@ -15,7 +15,7 @@ rule filter_genebass:
     input:
         results_pq=config["genebass_results_pq"],
         phenotype_metadata_pq=f"{UKBB_PROCESSED_PHENOTYPES_DIR}/latest.meta.parquet",
-    conda: f'{CONDA_ENV_YAML_DIR}/ukbb-trait-analysis-R.yaml'
+    # conda: f'{CONDA_ENV_YAML_DIR}/ukbb-trait-analysis-py.yaml'
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
         bonferroni_cutoff=float(config["genebass_bonferroni_cutoff"])

@@ -13,10 +13,10 @@ rule extract_genebass:
         ntasks=1,
         mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
     output:
-        results_pq=config["genebass_results_pq"],
+        results_pq=directory(config["genebass_results_pq"]),
     input:
         results_mt=config["genebass_results_mt"],
-    conda: f'{CONDA_ENV_YAML_DIR}/ukbb-trait-analysis-R.yaml'
+    conda: f'{CONDA_ENV_YAML_DIR}/ukbb-trait-analysis-hail.yaml'
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
     wildcard_constraints:

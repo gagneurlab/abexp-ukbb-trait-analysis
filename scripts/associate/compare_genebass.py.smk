@@ -3,8 +3,8 @@ SNAKEFILE_DIR = os.path.dirname(SNAKEFILE)
 
 SCRIPT=os.path.basename(SNAKEFILE)[:-4]
 
-
 OUTPUT_BASEPATH=f'''{config["trait_associations"]}/cov={{covariates}}/fset={{feature_set}}'''
+
 
 rule associate__compare_genebass:
     threads: 16
@@ -16,7 +16,9 @@ rule associate__compare_genebass:
         significant_genes_tsv=f"{OUTPUT_BASEPATH}/significant_genes.tsv",
         touch_file=touch(f"{OUTPUT_BASEPATH}/compare_genebass.done"),
     input:
-        genebass_pq=config["genebass_results_pq"],
+        # genebass_pq=config["genebass_results_pq"].format(genebass_version="300k"),
+        genebass_300k_pq=config["genebass_results_pq"].format(genebass_version="300k"),
+        genebass_500k_pq=config["genebass_results_pq"].format(genebass_version="500k"),
         protein_coding_genes_pq=config["protein_coding_genes_pq"],
         associations_pq=f"{OUTPUT_BASEPATH}/associations.parquet",
         featureset_config=f"{OUTPUT_BASEPATH}/config.yaml",
