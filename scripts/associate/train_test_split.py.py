@@ -44,7 +44,7 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'train_test_split',
         default_wildcards={
-            "phenotype_col": "Asthma",
+            "phenotype_col": "systolic_blood_pressure",
             # "phenotype_col": "systolic_blood_pressure_f4080_0_0",
             "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex+age+genPC+CLMP",

@@ -99,17 +99,17 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__polygenic_risk_score',
         default_wildcards={
-            #"phenotype_col": "standing_height",
+            "phenotype_col": "standing_height",
             #"phenotype_col": "glycated_haemoglobin_hba1c",
             #"phenotype_col": "Lipoprotein_A",
             #"phenotype_col": "BodyMassIndex",
             #"phenotype_col": "Triglycerides",
-            "phenotype_col": "LDL_direct",
+            #"phenotype_col": "LDL_direct",
             #"phenotype_col": "systolic_blood_pressure",
             #"phenotype_col": "HDL_cholesterol",
             #"feature_set": "LOFTEE_pLoF",
-            "feature_set": "AbExp_all_tissues",
-            # "feature_set": "LOFTEE_pLoF",
+            #"feature_set": "AbExp_all_tissues",
+            "feature_set": "LOFTEE_pLoF",
             "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex_age_genPC_CLMP",
             # "covariates": "sex_age_genPC",
@@ -647,7 +647,7 @@ plot = (pn.ggplot(age_data_df.reset_index(), pn.aes(x='age')) +\
 )
 display(plot)
 
-# %% [markdown]
+# %% [markdown] {"tags": [], "jp-MarkdownHeadingCollapsed": true}
 # ## Testing
 
 # %%

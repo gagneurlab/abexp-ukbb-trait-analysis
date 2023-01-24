@@ -132,6 +132,16 @@ rule all:
         # *hdl_cholesterol_term_pvals,
         *all_phenotypes_output,
         expand(rules.compare_associations.output, comparison=["all"]),
-
+        expand(
+            rules.associate__polygenic_risk_score.output, 
+            feature_set=[
+                "LOFTEE_pLoF",
+                "AbExp_all_tissues",
+                "max_AbExp",
+                "median_AbExp"
+            ],
+            phenotype_col=all_phenotypes,
+            covariates=["sex_age_genPC_CLMP_PRS"]
+        ),
 
 localrules: all

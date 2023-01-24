@@ -11,7 +11,7 @@ OUTPUT_BASEPATH=f'''{config["trait_associations"]}/cov={{covariates}}/fset={{fea
 
 
 rule associate__polygenic_risk_score:
-    threads: 64
+    threads: 16
     resources:
         ntasks=1,
         mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
