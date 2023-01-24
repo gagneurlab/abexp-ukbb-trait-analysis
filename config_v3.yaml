@@ -14,11 +14,12 @@ ukbb_decoded_phenotypes_dir: "/s/project/uk_biobank/processed/decoded_phenotypes
 
 # input
 # "gs://ukbb-exome-public/300k/results/results.mt"
-genebass_results_mt: "/s/project/rep/processed/genebass/results.mt"
+genebass_results_mt: "/s/project/rep/processed/genebass/{genebass_version}/results.mt"
 # output
-genebass_results_pq: "/s/project/rep/processed/genebass/results.parquet"
-genebass_results_filtered_pq: "/s/project/rep/processed/genebass/filtered.parquet"
-genebass_filtered_phenotypes_pq: "/s/project/rep/processed/genebass/filtered_phenotypes.parquet"
+genebass_results_pq: "/s/project/rep/processed/genebass/{genebass_version}/results.parquet"
+genebass_results_filtered_pq: "/s/project/rep/processed/genebass/{genebass_version}/filtered.parquet"
+genebass_filtered_phenotypes_pq: "/s/project/rep/processed/genebass/{genebass_version}/filtered_phenotypes.parquet"
+
 genebass_bonferroni_cutoff: 0.01
 
 # config_dir will be copied to output_basedir
