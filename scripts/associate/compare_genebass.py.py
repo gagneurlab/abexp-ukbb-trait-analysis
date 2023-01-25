@@ -409,7 +409,7 @@ matplotlib_venn.venn3(
         set(combined_regression_results_df[combined_regression_results_df["Genebass (300k WES)"] < pval_cutoff].index.get_level_values("gene")),
         set(combined_regression_results_df[combined_regression_results_df["Genebass (500k WES)"] < pval_cutoff].index.get_level_values("gene")),
     ),
-    set_labels = (y, "Genebass (300k WES)", "Genebass (500k WES)"),
+    set_labels = (snakemake.wildcards["feature_set"], "Genebass (300k WES)", "Genebass (500k WES)"),
     ax=ax
 )
 display(ax)
