@@ -401,7 +401,7 @@ pn.ggsave(plot, path + ".pdf", dpi=DPI)
 fig, ax = plt.subplots()
 matplotlib_venn.venn3(
     (
-        set(combined_regression_results_df[combined_regression_results_df[y] < cutoff].index.get_level_values("gene")),
+        set(combined_regression_results_df[combined_regression_results_df[snakemake.wildcards["feature_set"]] < cutoff].index.get_level_values("gene")),
         set(combined_regression_results_df[combined_regression_results_df["Genebass (300k WES)"] < cutoff].index.get_level_values("gene")),
         set(combined_regression_results_df[combined_regression_results_df["Genebass (500k WES)"] < cutoff].index.get_level_values("gene")),
     ),
@@ -426,6 +426,8 @@ fig.savefig(path + ".pdf", dpi=DPI)
 # # save stats
 
 # %%
+y = snakemake.wildcards["feature_set"]
+
 significant_genes = (
     combined_regression_results_df
     .assign(**{

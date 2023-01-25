@@ -604,6 +604,7 @@ for model in ["basic", "restricted", "full"]:
             prc_df.append(pd.DataFrame({"extreme": extreme, "percentile": percentile, "method": model, "precision" : prc[0], "recall" : prc[1], "auPRC": sklearn.metrics.auc(prc[1], prc[0])}))
 prc_df = pd.concat(prc_df)
 prc_df["method"] = prc_df["method"].replace({"basic": "Age+Sex+PC", "restricted": "Age+Sex+PC+PRS", "full": f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}"})
+prc_df = prc_df.assign(**snakemake.wildcards)
 
 # %%
 # Save prc 
