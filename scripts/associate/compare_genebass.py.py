@@ -91,6 +91,10 @@ if "plot_dpi" in snakemake.params:
 else:
     DPI=450
 
+# %%
+pval_cutoff = snakemake.params["pval_cutoff"]
+pval_cutoff
+
 # %% [markdown] {"tags": []}
 # # read features
 
@@ -328,7 +332,7 @@ plot_df, plot = plot_pvalues(
     combined_regression_results_df,
     x = "Genebass (300k WES)",
     y = snakemake.wildcards["feature_set"],
-    cutoff = 0.05,
+    cutoff = pval_cutoff,
     crop_pvalue = 10 ** -150,
 )
 
@@ -345,7 +349,7 @@ plot_df, plot = plot_pvalues(
     combined_regression_results_df,
     x = "Genebass (500k WES)",
     y = snakemake.wildcards["feature_set"],
-    cutoff = 0.05,
+    cutoff = pval_cutoff,
     crop_pvalue = 10 ** -150,
 )
 
@@ -365,7 +369,7 @@ plot_df, plot = plot_pvalues(
     combined_regression_results_df,
     x = "Genebass (300k WES)",
     y = snakemake.wildcards["feature_set"],
-    cutoff = 0.05,
+    cutoff = pval_cutoff,
     crop_pvalue = 10 ** -10,
 )
 
@@ -382,7 +386,7 @@ plot_df, plot = plot_pvalues(
     combined_regression_results_df,
     x = "Genebass (500k WES)",
     y = snakemake.wildcards["feature_set"],
-    cutoff = 0.05,
+    cutoff = pval_cutoff,
     crop_pvalue = 10 ** -10,
 )
 
@@ -401,9 +405,9 @@ pn.ggsave(plot, path + ".pdf", dpi=DPI)
 fig, ax = plt.subplots()
 matplotlib_venn.venn3(
     (
-        set(combined_regression_results_df[combined_regression_results_df[snakemake.wildcards["feature_set"]] < cutoff].index.get_level_values("gene")),
-        set(combined_regression_results_df[combined_regression_results_df["Genebass (300k WES)"] < cutoff].index.get_level_values("gene")),
-        set(combined_regression_results_df[combined_regression_results_df["Genebass (500k WES)"] < cutoff].index.get_level_values("gene")),
+        set(combined_regression_results_df[combined_regression_results_df[snakemake.wildcards["feature_set"]] < pval_cutoff].index.get_level_values("gene")),
+        set(combined_regression_results_df[combined_regression_results_df["Genebass (300k WES)"] < pval_cutoff].index.get_level_values("gene")),
+        set(combined_regression_results_df[combined_regression_results_df["Genebass (500k WES)"] < pval_cutoff].index.get_level_values("gene")),
     ),
     set_labels = (y, "Genebass (300k WES)", "Genebass (500k WES)"),
     ax=ax
@@ -431,9 +435,9 @@ y = snakemake.wildcards["feature_set"]
 significant_genes = (
     combined_regression_results_df
     .assign(**{
-        "Genebass_300k_signif": (combined_regression_results_df["Genebass (300k WES)"] < cutoff),
-        "Genebass_500k_signif": (combined_regression_results_df["Genebass (500k WES)"] < cutoff),
-        f"{y}_signif": (combined_regression_results_df[y] < cutoff),
+        "Genebass_300k_signif": (combined_regression_results_df["Genebass (300k WES)"] < pval_cutoff),
+        "Genebass_500k_signif": (combined_regression_results_df["Genebass (500k WES)"] < pval_cutoff),
+        f"{y}_signif": (combined_regression_results_df[y] < pval_cutoff),
     })
     .query(f"Genebass_300k_signif | Genebass_500k_signif | {y}_signif")
     # .query(f"{y}_signif")

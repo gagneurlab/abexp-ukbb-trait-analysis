@@ -26,6 +26,7 @@ rule associate__compare_genebass:
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
         output_basedir=OUTPUT_BASEPATH,
+        pval_cutoff=0.05,
     wildcard_constraints:
         covariates="[^/]+",
 #     log:
