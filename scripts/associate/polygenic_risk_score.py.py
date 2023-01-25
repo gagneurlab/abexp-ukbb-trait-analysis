@@ -87,7 +87,7 @@ snakefile_path = os.getcwd() + "/../../Snakefile"
 snakefile_path
 
 # %%
-# del snakemake
+#del snakemake
 
 # %%
 try:
@@ -204,18 +204,18 @@ covariates_df = spark.read.parquet(snakemake.input["covariates_pq"])
 covariates_df_columns = covariates_df.columns
 #covariates_df_columns
 
-# %% [markdown] {"tags": []}
+# %% [raw] {"tags": []}
 # ## clumping
 
-# %%
-clumping_variants_df = (
-    pl.read_parquet(snakemake.input["clumping_variants_pq"])
-    .filter(pl.col("gene").is_in(significant_genes))
-)
-clumping_variants_df
+# %% [raw]
+# clumping_variants_df = (
+#     pl.read_parquet(snakemake.input["clumping_variants_pq"])
+#     .filter(pl.col("gene").is_in(significant_genes))
+# )
+# clumping_variants_df
 
-# %%
-clumping_variants = clumping_variants_df["variant"].unique().to_list()
+# %% [raw]
+# clumping_variants = clumping_variants_df["variant"].unique().to_list()
 
 # %% [markdown]
 # ## feature dfs
@@ -323,7 +323,7 @@ full_features_df = (
 # # select variables
 
 # %%
-def format_formula(formula, add_clumping=True, clumping_variants=clumping_variants):
+def format_formula(formula, add_clumping=False, clumping_variants=None):
     if not isinstance(formula, patsy.ModelDesc):
         model_desc = patsy.ModelDesc.from_formula(formula)
     else:
@@ -429,12 +429,11 @@ prs_features_pd_df["sex_f31_0_0"] = prs_features_pd_df["sex_f31_0_0"].astype(int
 # # read samples
 
 # %%
-try:
-    samples = pd.read_parquet(f"/s/project/rep/processed/trait_associations_v3/ukbb_wes_200k/associate/{phenotype_col}/cov=sex_age_genPC_CLMP_PRS/train_test_split.parquet")
-except FileNotFoundError:
-    print("Defaulting on sample reads")
-    samples = pd.read_parquet("/s/project/rep/processed/trait_associations_v2/ukbb_wes_200k/associate/Asthma/cov=sex_age_genPC_CLMP_PRS/train_test_split.parquet")
-samples = samples[["individual", "fold"]]
+train_test_split = pd.read_parquet(snakemake.input["train_test_split_pq"])
+train_test_split
+
+# %%
+samples = train_test_split[["individual", "fold"]]
 samples
 
 # %%
@@ -455,9 +454,6 @@ prs_features_pd_df
 # %%
 prs_features_pd_df = prs_features_pd_df.dropna()
 prs_features_pd_df
-
-# %% [markdown] {"jp-MarkdownHeadingCollapsed": true, "tags": []}
-# ## prepare splits
 
 # %% [markdown]
 # # perform regression
@@ -526,7 +522,7 @@ basic_model_r2 = sklearn.metrics.r2_score(y_test, basic_pred_test)
 basic_model_r2
 
 # %%
-nr_of_quantiles = 10
+# nr_of_percentiles = 10
 
 pred_df = (
     test_df[["individual", "age_when_attended_assessment_centre_f21003_0_0", "sex_f31_0_0", phenotype_col]]
@@ -534,39 +530,40 @@ pred_df = (
     .assign(**{
         "phenotype_col": phenotype_col,
         "method": snakemake.wildcards["feature_set"],
-        "phenotype_quantile": np.array(pd.qcut(test_df[phenotype_col], nr_of_quantiles, labels=False)),
-        "at_risk": np.array(pd.qcut(test_df[phenotype_col], 10, labels=False)) == 9,
-        "at_risk_low": np.array(pd.qcut(test_df[phenotype_col], 10, labels=False)) == 0,
+        # "phenotype_percentile": np.array(pd.qcut(test_df[phenotype_col], nr_of_quantiles, labels=False)),
+        # "at_risk_high": np.array(pd.qcut(test_df[phenotype_col], 10, labels=False)) == nr_of_percentiles - 1,
+        # "at_risk_low": np.array(pd.qcut(test_df[phenotype_col], 10, labels=False)) == 0,
         "full_model_pred": full_pred_test,
-        "full_model_pred_quantile": np.array(pd.qcut(full_pred_test, nr_of_quantiles, labels=False)),
+        # "full_model_pred_percentile": np.array(pd.qcut(full_pred_test, nr_of_quantiles, labels=False)),
         "restricted_model_pred": restricted_pred_test,
-        "restricted_model_pred_quantile": np.array(pd.qcut(restricted_pred_test, nr_of_quantiles, labels=False)),
+        # "restricted_model_pred_percentile": np.array(pd.qcut(restricted_pred_test, nr_of_quantiles, labels=False)),
         "basic_model_pred": basic_pred_test,
         #"basic_model_pred_quantile": np.array(pd.qcut(basic_pred_test, nr_of_quantiles, labels=False)),
+        **snakemake.wildcards,
     })
 )
 pred_df
 
-# %%
-pred_df = (
-    pred_df
-    .assign(**{
-        "residuals_full": pred_df["measurement"] - pred_df["full_model_pred"],
-        "residuals_restricted": pred_df["measurement"] - pred_df["restricted_model_pred"],
-        "residuals_basic": pred_df["measurement"] - pred_df["basic_model_pred"],
-        "abs_diff_full_restricted_pred": (pred_df["full_model_pred"] - pred_df["basic_model_pred"]).abs(),
-        "full_model_pred_rank": pred_df["full_model_pred"].rank(ascending = False),
-        "restricted_model_pred_rank": pred_df["restricted_model_pred"].rank(ascending = False),
-        "basic_model_pred_rank": pred_df["basic_model_pred"].rank(ascending = False),
-        #"pred_full_at_risk_low": pred_df["full_model_pred_quantile"] < 2,
-        #"pred_restricted_at_risk_low": pred_df["restricted_model_pred_quantile"] < 2
-    })
-)
-pred_df
+# %% [raw]
+# pred_df = (
+#     pred_df
+#     .assign(**{
+#         "residuals_full": pred_df["measurement"] - pred_df["full_model_pred"],
+#         "residuals_restricted": pred_df["measurement"] - pred_df["restricted_model_pred"],
+#         "residuals_basic": pred_df["measurement"] - pred_df["basic_model_pred"],
+#         "abs_diff_full_restricted_pred": (pred_df["full_model_pred"] - pred_df["basic_model_pred"]).abs(),
+#         "full_model_pred_rank": pred_df["full_model_pred"].rank(ascending = False),
+#         "restricted_model_pred_rank": pred_df["restricted_model_pred"].rank(ascending = False),
+#         "basic_model_pred_rank": pred_df["basic_model_pred"].rank(ascending = False),
+#         #"pred_full_at_risk_low": pred_df["full_model_pred_quantile"] < 2,
+#         #"pred_restricted_at_risk_low": pred_df["restricted_model_pred_quantile"] < 2
+#     })
+# )
+# pred_df
 
 # %%
 # Save predictions
-pred_df[["individual", "age", "sex", "phenotype_col", "measurement", "method", "basic_model_pred", "restricted_model_pred", "full_model_pred"]].to_parquet(snakemake.output["predictions_pq"], index=False)
+pred_df.to_parquet(snakemake.output["predictions_pq"], index=False)
 
 # %% [raw]
 # plot_df = pred_df[["phenotype_col", "measurement", "basic_model_pred", "restricted_model_pred", "full_model_pred"]].rename(columns={
@@ -613,8 +610,8 @@ prc_df["method"] = prc_df["method"].replace({"basic": "Age+Sex+PC", "restricted"
 prc_df.query("method=='Age+Sex+PC' or method=='Age+Sex+PC+PRS'").to_parquet(snakemake.output["precision_recall_baseline_pq"], index=False)
 prc_df.query(f"method=='Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}'").to_parquet(snakemake.output["precision_recall_full_pq"], index=False)
 
-# %% [raw]
-# prc_df
+# %%
+prc_df
 
 # %% [raw]
 # plot = (

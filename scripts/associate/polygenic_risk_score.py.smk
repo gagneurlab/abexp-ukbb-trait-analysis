@@ -43,6 +43,7 @@ rule associate__polygenic_risk_score:
         # sample splits
         samples_pq=f"{COVARIATES_BASEPATH}/samples.parquet",
         samples_pq_done=f"{COVARIATES_BASEPATH}/samples.parquet.done",
+        train_test_split_pq=f"{COVARIATES_BASEPATH}/train_test_split.parquet",
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
         output_basedir=OUTPUT_BASEPATH,
