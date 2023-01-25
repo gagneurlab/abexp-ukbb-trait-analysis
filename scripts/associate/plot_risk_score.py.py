@@ -52,7 +52,7 @@ snakefile_path = os.getcwd() + "/../../Snakefile"
 snakefile_path
 
 # %%
-# del snakemake
+del snakemake
 
 # %%
 try:
@@ -64,12 +64,12 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__polygenic_risk_score',
         default_wildcards={
-            "phenotype_col": "standing_height",
+            #"phenotype_col": "standing_height",
             #"phenotype_col": "glycated_haemoglobin_hba1c",
             #"phenotype_col": "Lipoprotein_A",
             #"phenotype_col": "BodyMassIndex",
             #"phenotype_col": "Triglycerides",
-            #"phenotype_col": "LDL_direct",
+            "phenotype_col": "LDL_direct",
             #"phenotype_col": "systolic_blood_pressure",
             #"phenotype_col": "HDL_cholesterol",
             #"feature_set": "LOFTEE_pLoF",
@@ -123,7 +123,7 @@ restricted_model_r2 = sklearn.metrics.r2_score(pred_df["measurement"], pred_df["
 basic_model_r2 = sklearn.metrics.r2_score(pred_df["measurement"], pred_df["basic_model_pred"])
 
 # %%
-nr_of_quantiles = 10
+nr_of_quantiles = 100
 
 pred_df = (
     pred_df
@@ -161,7 +161,8 @@ pred_df
 # Read prc 
 prc_baseline_df = pd.read_parquet(snakemake.output["precision_recall_baseline_pq"])
 prc_full_df = pd.read_parquet(snakemake.output["precision_recall_full_pq"])
-prc_df = pd.concat([prc_baseline_df, prc_full_df])
+prc_plof_df = pd.read_parquet("/s/project/rep/processed/trait_associations_v3/ukbb_wes_200k/associate/LDL_direct/cov=sex_age_genPC_CLMP_PRS/fset=LOFTEE_pLoF/polygenic_risk_score/precision_recall.full.parquet")
+prc_df = pd.concat([prc_baseline_df, prc_full_df, prc_plof_df])
 
 # %% [markdown] {"tags": []}
 # ## Plots
@@ -190,8 +191,14 @@ plot = (
     )
 )
 
-pn.ggsave(plot = plot, filename = snakemake.output["predictions_plot_png"], dpi=DPI)
+#pn.ggsave(plot = plot, filename = snakemake.output["predictions_plot_png"], dpi=DPI)
 display(plot)
+
+# %%
+pred_df.query("full_model_pred_quantile==0")["at_risk_low"].agg(["size", "sum"])
+
+# %%
+pred_df.query("restricted_model_pred_quantile==0")["at_risk_low"].agg(["size", "sum"])
 
 # %%
 plot_df = pred_df[["full_model_pred", "restricted_model_pred"]].rename(columns = {"full_model_pred": f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}", "restricted_model_pred": "Age+Sex+PC+PRS"})
@@ -213,15 +220,33 @@ display(plot)
 plot = (
     pn.ggplot(prc_df, pn.aes(x="recall", y="precision", color="method"))
     + pn.geom_step()
-    + pn.facet_grid("extreme ~ percentile", labeller = 'label_both')
-    + pn.theme(figure_size=(16, 8))
+    + pn.facet_grid("percentile ~ extreme", labeller = 'label_both')
+    + pn.theme(figure_size=(8, 8))
     + pn.ggtitle(f"Precision-Recall curves of LGBMRegressor models predicting extreme {phenotype_col} ({phenocode})")
+    + pn.coord_equal()
 )
-pn.ggsave(plot = plot, filename = snakemake.output["prc_plot_png"], dpi=DPI)
+#pn.ggsave(plot = plot, filename = snakemake.output["prc_plot_png"], dpi=DPI)
 display(plot)
 
 # %%
-prc_df.groupby(["extreme", "percentile", "method"])["auPRC"].first()
+df = prc_df.groupby(["extreme", "percentile", "method"])["auPRC"].first()
+
+# %%
+df.reset_index()
+
+# %%
+plot = (
+    pn.ggplot(df.reset_index(), pn.aes(y="auPRC", x="method"))
+    + pn.ggtitle(f"Predictions of LGBM models for {phenotype_col} ({phenocode})")
+    + pn.geom_bar(stat="identity")
+    + pn.facet_grid("percentile ~ extreme")
+    + pn.theme(figure_size=(6, 8))
+    #+ pn.theme(axis_text_x = pn.element_text(rotation=90))
+    + pn.coord_flip()
+)
+
+#pn.ggsave(plot = plot, filename = snakemake.output["predictions_plot_png"], dpi=DPI)
+display(plot)
 
 # %%
 risk_type = "at_risk_low"
