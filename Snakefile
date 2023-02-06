@@ -131,7 +131,7 @@ rule all:
         # *hdl_cholesterol,
         # *hdl_cholesterol_term_pvals,
         *all_phenotypes_output,
-        expand(rules.compare_associations.output, comparison=["all"]),
+        expand(rules.compare_associations.output, comparison=["all", "paper_figure", "paper_figure_all_traits"]),
         expand(
             rules.associate__polygenic_risk_score.output, 
             feature_set=[
