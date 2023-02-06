@@ -5,6 +5,9 @@ channels:
   - bioconda
 
 dependencies:
-  - python>=3.7
-  - hail
+  - python=3.7
+  - openjdk=11
   - pandas
+  - pip
+  - pip:
+    - hail

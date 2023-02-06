@@ -119,7 +119,8 @@ except NameError:
             # "phenotype_col": "systolic_blood_pressure_automated_reading_f4080_0_0",
             # "phenotype_col": "hdl_cholesterol_f30760_0_0",
             # "feature_set": "LOFTEE_pLoF",
-            "feature_set": "AbExp_all_tissues",
+            "feature_set": "max_AbExp",
+            # "feature_set": "AbExp_all_tissues",
             # "feature_set": "LOFTEE_pLoF",
             "covariates": "randomized_sex_age_genPC_CLMP_PRS",
             # "covariates": "sex_age_genPC_CLMP_PRS",
@@ -154,6 +155,99 @@ restricted_formula = config["covariates"]["restricted_formula"]
 print(restricted_formula)
 
 # %% [markdown]
+# # Broadcast/deref function definitions
+
+# %%
+import tempfile
+
+# %%
+tmpdir = tempfile.TemporaryDirectory()
+tmpdir
+
+# %%
+from typing import Union
+import cloudpickle
+
+def spark_broadcast_feather(df: Union[pd.DataFrame, pl.DataFrame, pl.LazyFrame], tmpdir: tempfile.TemporaryDirectory=tmpdir) -> str:
+    tmpfile = tempfile.mktemp(dir=tmpdir.name, suffix=".feather")
+    if isinstance(df, pd.DataFrame):
+        df.to_feather(tmpfile)
+    elif isinstance(df, pl.LazyFrame):
+        df.collect().write_ipc(tmpfile)
+    elif isinstance(df, pl.DataFrame):
+        df.write_ipc(tmpfile)
+    else:
+        raise ValueError(f"Unknown dataframe type: '{type(df)}'")
+        
+    
+    # add file to all spark nodes
+    spark.sparkContext.addFile(tmpfile)
+    
+    # file will be accessible on all hosts by its name
+    sparkfilename = os.path.basename(tmpfile)
+    
+    return "spark://" + sparkfilename
+
+def spark_broadcast_pickle(obj, tmpdir: tempfile.TemporaryDirectory=tmpdir) -> str:
+    tmpfile = tempfile.mktemp(dir=tmpdir.name, suffix=".pkl")
+    with open(tmpfile, "wb") as fd:
+        cloudpickle.dump(obj, fd)
+    
+    # add file to all spark nodes
+    spark.sparkContext.addFile(tmpfile)
+    
+    sparkfilename = os.path.basename(tmpfile)
+    
+    return "spark://" + sparkfilename
+
+def get_sparkfile_path(obj: str):
+    if obj.startswith("spark://"):
+        # remove 'spark://' prefix
+        sparkfilename = obj[8:]
+    
+    return pyspark.SparkFiles.get(sparkfilename)
+
+
+# %%
+def broadcast(obj, idempotent=True):
+    if idempotent:
+        # check if is already a reference and return
+        if isinstance(obj, pyspark.Broadcast):
+            return obj
+        elif ray is not None and isinstance(obj, ray.ObjectRef):
+            return obj
+        elif isinstance(obj, str):
+            return obj
+    
+    if use_ray:
+        return ray.put(obj)
+    else:
+        return spark.sparkContext.broadcast(obj)
+
+
+# %%
+import pickle
+
+def deref(obj):
+    if isinstance(obj, pyspark.Broadcast):
+        return obj.value
+    elif ray is not None and isinstance(obj, ray.ObjectRef):
+        with ray_context:
+            return ray.get(obj)
+    elif isinstance(obj, str) and obj.startswith("spark://"):
+        # remove 'spark://' prefix
+        sparkfilename = obj[8:]
+        
+        if sparkfilename.endswith(".feather"):
+            return pd.read_feather(pyspark.SparkFiles.get(sparkfilename))
+        elif sparkfilename.endswith(".pkl"):
+            with open(pyspark.SparkFiles.get(sparkfilename), "rb") as fd:
+                return pickle.load(fd)
+    else:
+        return obj
+
+
+# %% [markdown]
 # # Read covariates
 
 # %%
@@ -169,12 +263,24 @@ covariates_df_columns = covariates_df.columns
 # )
 
 # %%
-covariates_sparkfilename = os.path.basename(snakemake.input["covariates_ipc"])
-covariates_sparkfilename
+import sklearn
+
+# perform data normalization
+normalized_covariates_df = covariates_df.collect().to_pandas()
+cols_to_normalize = list(set(covariates_df.columns).difference(phenotype_col))
+# cols_to_normalize = ["age_when_attended_assessment_centre_f21003_0_0"]
+cols_to_normalize = [col for col, dtype in normalized_covariates_df.dtypes[cols_to_normalize].to_dict().items() if (
+    pd.api.types.is_float_dtype(dtype)
+    or (pd.api.types.is_integer_dtype(dtype) and (np.abs(np.max(normalized_covariates_df[col])) > 2))
+)]
+display(cols_to_normalize)
+
+normalized_covariates_df = normalized_covariates_df.assign(**{
+    col: sklearn.preprocessing.StandardScaler().fit_transform(normalized_covariates_df[[col]])[:, 0] for col in cols_to_normalize
+})
 
 # %%
-# add file to all spark nodes
-spark.sparkContext.addFile(snakemake.input["covariates_ipc"])
+normalized_covariates_df
 
 # %% [markdown] {"tags": []}
 # ## clumping
@@ -269,33 +375,6 @@ def get_variables_from_formula(formula, lhs=True, rhs=True):
 # %%
 # get_variables_from_formula(test_formula)
 
-# %%
-def broadcast(obj, idempotent=True):
-    if idempotent:
-        if isinstance(obj, pyspark.Broadcast):
-            return obj
-        elif ray is not None and isinstance(obj, ray.ObjectRef):
-            return obj
-        elif isinstance(obj, str):
-            return obj
-    
-    if use_ray:
-        return ray.put(obj)
-    else:
-        return spark.sparkContext.broadcast(obj)
-
-
-# %%
-def deref(obj):
-    if isinstance(obj, pyspark.Broadcast):
-        return obj.value
-    elif ray is not None and isinstance(obj, ray.ObjectRef):
-        with ray_context:
-            return ray.get(obj)
-    else:
-        return obj
-
-
 # %% {"tags": []}
 # broadcast_covariates_df = broadcast(covariates_df.to_arrow())
 broadcast_clumping_variants_df = broadcast(clumping_variants_df)
@@ -309,13 +388,16 @@ from pyarrow import feather
 import pyarrow as pa
 
 # %%
-data_df = feather.read_table(
+data_df_schema = feather.read_table(
     snakemake.input["covariates_ipc"],
     use_threads=False,
-    memory_map=True
-)
+    memory_map=True,
+    columns=[phenotype_col],
+).schema
+data_df_schema
 
-data_type = data_df.schema[data_df.schema.get_field_index(snakemake.wildcards["phenotype_col"])].type
+# %%
+data_type = data_df_schema[data_df_schema.get_field_index(phenotype_col)].type
 data_type
 
 # %%
@@ -337,7 +419,7 @@ else:
 # ).fit()
 # # broadcast_restricted_model = spark.sparkContext.broadcast(restricted_model)
 
-# %%
+# %% {"tags": []}
 from scipy.stats.distributions import chi2
 from statsmodels.discrete.discrete_model import BinaryResultsWrapper
 import statsmodels.api as sm
@@ -381,6 +463,852 @@ def prsquared_adj(binary_model: BinaryResultsWrapper):
 
 
 # %% {"tags": []}
+import warnings
+from copy import deepcopy
+from importlib.resources import open_text
+from math import sqrt
+
+import numpy as np
+import scipy.linalg
+import scipy.special
+from scipy.stats import chi2, norm
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.exceptions import ConvergenceWarning
+from sklearn.preprocessing import LabelEncoder
+from sklearn.utils.extmath import fast_logdet
+from sklearn.utils.multiclass import check_classification_targets
+from sklearn.utils.validation import check_is_fitted
+from tabulate import tabulate
+
+
+class FirthLogisticRegression(BaseEstimator, ClassifierMixin):
+    """
+    Logistic regression with Firth's bias reduction method.
+
+    This is based on the implementation in the `logistf` R package. Please see the
+    `logistf` reference and Heinze & Schemper (2002) for details about the procedure.
+
+    Parameters
+    ----------
+    max_iter
+        The maximum number of Newton-Raphson iterations.
+    max_halfstep
+        The maximum number of step-halvings in one Newton-Raphson iteration.
+    max_stepsize
+        The maximum step size - for each coefficient, the step size is forced to
+        be less than max_stepsize.
+    pl_max_iter
+        The maximum number of Newton-Raphson iterations for finding profile likelihood
+        confidence intervals.
+    pl_max_halfstep
+        The maximum number of step-halvings in one iteration for finding profile
+        likelihood confidence intervals.
+    pl_max_stepsize
+        The maximum step size while finding PL confidence intervals.
+    tol
+        Convergence tolerance for stopping.
+    fit_intercept
+        Specifies if intercept should be added.
+    skip_pvals
+        If True, p-values will not be calculated. Calculating the p-values can be
+        time-consuming if `wald=False` since the fitting procedure is repeated for each
+        coefficient.
+    skip_ci
+        If True, confidence intervals will not be calculated. Calculating the confidence
+        intervals via profile likelihoood is time-consuming.
+    alpha
+        Significance level (confidence interval = 1-alpha). 0.05 as default for 95% CI.
+    wald
+        If True, uses Wald method to calculate p-values and confidence intervals.
+    test_vars
+        Index or list of indices of the variables for which to calculate confidence
+        intervals and p-values. If None, calculate for all variables. This option has
+        no effect if wald=True.
+
+    Attributes
+    ----------
+    bse_
+        Standard errors of the coefficients.
+    classes_
+        A list of the class labels.
+    ci_
+        The fitted profile likelihood confidence intervals.
+    coef_
+        The coefficients of the features.
+    intercept_
+        Fitted intercept. If `fit_intercept = False`, the intercept is set to zero.
+    loglik_
+        Fitted penalized log-likelihood.
+    n_iter_
+        Number of Newton-Raphson iterations performed.
+    pvals_
+        p-values calculated by penalized likelihood ratio tests.
+    has_converged_
+        information whether the Newton-Raphson iterations converged
+
+    References
+    ----------
+    Firth D (1993). Bias reduction of maximum likelihood estimates.
+    Biometrika 80, 27–38.
+
+    Heinze G, Schemper M (2002). A solution to the problem of separation in logistic
+    regression. Statistics in Medicine 21: 2409-2419.
+    """
+
+    def __init__(
+            self,
+            max_iter=25,
+            max_halfstep=0,
+            max_stepsize=5,
+            pl_max_iter=100,
+            pl_max_halfstep=0,
+            pl_max_stepsize=5,
+            tol=0.0001,
+            fit_intercept=True,
+            skip_pvals=False,
+            skip_ci=False,
+            alpha=0.05,
+            wald=False,
+            test_vars=None,
+    ):
+        self.max_iter = max_iter
+        self.max_stepsize = max_stepsize
+        self.max_halfstep = max_halfstep
+        self.pl_max_iter = pl_max_iter
+        self.pl_max_halfstep = pl_max_halfstep
+        self.pl_max_stepsize = pl_max_stepsize
+        self.tol = tol
+        self.fit_intercept = fit_intercept
+        self.skip_pvals = skip_pvals
+        self.skip_ci = skip_ci
+        self.alpha = alpha
+        self.wald = wald
+        self.test_vars = test_vars
+
+    def _more_tags(self):
+        return {"binary_only": True}
+
+    def _validate_input(self, X, y):
+        if self.max_iter < 0:
+            raise ValueError(
+                f"Maximum number of iterations must be positive; "
+                f"got max_iter={self.max_iter}"
+            )
+        if self.max_halfstep < 0:
+            raise ValueError(
+                f"Maximum number of step-halvings must >= 0; "
+                f"got max_halfstep={self.max_iter}"
+            )
+        if self.tol < 0:
+            raise ValueError(
+                f"Tolerance for stopping criteria must be positive; got tol={self.tol}"
+            )
+        X, y = self._validate_data(X, y, dtype=np.float64, ensure_min_samples=2)
+        check_classification_targets(y)
+
+        self.classes_ = np.unique(y)
+        if len(self.classes_) != 2:
+            raise ValueError(f"Got {len(self.classes_)} - only 2 classes supported.")
+        y = LabelEncoder().fit_transform(y).astype(X.dtype, copy=False)
+
+        return X, y
+
+    def fit(self, X, y):
+        X, y = self._validate_input(X, y)
+        if self.fit_intercept:
+            X = np.hstack((X, np.ones((X.shape[0], 1))))
+
+        self.coef_, self.loglik_, self.n_iter_, self.has_converged_ = _firth_newton_raphson(
+            X, y, self.max_iter, self.max_stepsize, self.max_halfstep, self.tol
+        )
+
+        self.bse_ = _bse(X, self.coef_)
+
+        if not self.skip_ci:
+            if not self.wald:
+                self.ci_ = _profile_likelihood_ci(
+                    X=X,
+                    y=y,
+                    fitted_coef=self.coef_,
+                    full_loglik=self.loglik_,
+                    max_iter=self.pl_max_iter,
+                    max_stepsize=self.pl_max_stepsize,
+                    max_halfstep=self.pl_max_halfstep,
+                    tol=self.tol,
+                    alpha=self.alpha,
+                    test_vars=self.test_vars,
+                )
+            else:
+                self.ci_ = _wald_ci(self.coef_, self.bse_, self.alpha)
+        else:
+            self.ci_ = np.full((self.coef_.shape[0], 2), np.nan)
+
+        # penalized likelihood ratio tests
+        if not self.skip_pvals:
+            if not self.wald:
+                self.pvals_ = _penalized_lrt(
+                    self.loglik_,
+                    X,
+                    y,
+                    self.max_iter,
+                    self.max_stepsize,
+                    self.max_halfstep,
+                    self.tol,
+                    self.test_vars,
+                )
+
+            else:
+                self.pvals_ = _wald_test(self.coef_, self.bse_)
+        else:
+            self.pvals_ = np.full(self.coef_.shape[0], np.nan)
+
+        if self.fit_intercept:
+            self.intercept_ = self.coef_[-1]
+            self.coef_ = self.coef_[:-1]
+        else:
+            self.intercept_ = 0
+
+        return self
+
+    def summary(self, xname=None, tablefmt="simple"):
+        """
+        Prints a summary table.
+
+        Parameters
+        ----------
+        xname
+            Names for the X variables. Default is x1, x2, ... Must match the number of
+            parameters in the model.
+        tablefmt
+            `tabulate` table format for output. Please see the documentation for
+            `tabulate` for options.
+        """
+        check_is_fitted(self)
+        if xname and len(xname) != len(self.coef_):
+            raise ValueError(
+                f"Length of xname ({len(xname)}) does not match the number of "
+                f"parameters in the model ({len(self.coef_)})"
+            )
+
+        if not xname:
+            xname = [f"x{i}" for i in range(1, len(self.coef_) + 1)]
+
+        coef = list(self.coef_)
+        if self.fit_intercept:
+            xname.append("Intercept")
+            coef.append(self.intercept_)
+
+        headers = [
+            "",
+            "coef",
+            "std err",
+            f"[{self.alpha / 2}",
+            f"{1 - self.alpha / 2}]",
+            "p-value",
+        ]
+        table = zip(xname, coef, self.bse_, self.ci_[:, 0], self.ci_[:, 1], self.pvals_)
+        table = tabulate(table, headers, tablefmt=tablefmt)
+        table += "\n\n"
+        table += f"Log-Likelihood: {round(self.loglik_, 4)}\n"
+        table += f"Newton-Raphson iterations: {self.n_iter_}\n"
+        print(table)
+        if self.fit_intercept:
+            xname.pop()
+        return
+
+    def decision_function(self, X):
+        check_is_fitted(self)
+        X = self._validate_data(X, reset=False)
+        scores = X @ self.coef_ + self.intercept_
+        return scores
+
+    def predict(self, X):
+        decision = self.decision_function(X)
+        if len(decision.shape) == 1:
+            indices = (decision > 0).astype(int)
+        else:
+            indices = decision.argmax(axis=1)
+        return self.classes_[indices]
+
+    def predict_proba(self, X):
+        decision = self.decision_function(X)
+        if decision.ndim == 1:
+            decision = np.c_[-decision, decision]
+        proba = scipy.special.expit(decision)
+        return proba
+
+
+def _firth_newton_raphson(X, y, max_iter, max_stepsize, max_halfstep, tol, mask=None):
+    # see logistf reference manual for explanation of procedure
+    coef = np.zeros(X.shape[1])
+    for iter in range(1, max_iter + 1):
+        preds = scipy.special.expit(X @ coef)
+        XW = _get_XW(X, preds, mask)
+
+        fisher_info_mtx = XW.T @ XW
+        hat = _hat_diag(XW)
+        U_star = np.matmul(X.T, y - preds + np.multiply(hat, 0.5 - preds))
+        step_size = np.linalg.lstsq(fisher_info_mtx, U_star, rcond=None)[0]
+        # if mask:
+        #     step_size[mask] = 0
+
+        # step-halving
+        mx = np.max(np.abs(step_size)) / max_stepsize
+        if mx > 1:
+            step_size = step_size / mx  # restrict to max_stepsize
+        coef_new = coef + step_size
+        preds_new = scipy.special.expit(X @ coef_new)
+        loglike = _loglikelihood(X, y, preds)
+        loglike_new = _loglikelihood(X, y, preds_new)
+        steps = 0
+        while loglike < loglike_new:
+            step_size *= 0.5
+            coef_new = coef + step_size
+            preds_new = scipy.special.expit(X @ coef_new)
+            loglike_new = _loglikelihood(X, y, preds_new)
+            steps += 1
+            if steps == max_halfstep:
+                warning_msg = "Step-halving failed to converge."
+                warnings.warn(warning_msg, ConvergenceWarning, stacklevel=2)
+                return coef_new, -loglike_new, iter, False
+
+        if iter > 1 and np.linalg.norm(coef_new - coef) < tol:
+            return coef_new, -loglike_new, iter, True
+
+        coef += step_size
+    warning_msg = (
+        "Firth logistic regression failed to converge. Try increasing max_iter."
+    )
+    warnings.warn(warning_msg, ConvergenceWarning, stacklevel=2)
+    return coef, -loglike_new, max_iter, False
+
+
+def _loglikelihood(X, y, preds):
+    # penalized log-likelihood
+    XW = _get_XW(X, preds)
+    fisher_info_mtx = XW.T @ XW
+    penalty = 0.5 * fast_logdet(fisher_info_mtx)
+    if not np.isfinite(penalty):
+        penalty = 0
+    return -1 * (np.sum(y * np.log(preds) + (1 - y) * np.log(1 - preds)) + penalty)
+
+
+def _get_XW(X, preds, mask=None):
+    # mask is 1-indexed because 0 == None
+    rootW = np.sqrt(preds * (1 - preds))
+    XW = rootW[:, np.newaxis] * X
+
+    # is this equivalent??
+    # https://github.com/georgheinze/logistf/blob/master/src/logistf.c#L150-L159
+    if mask is not None:
+        XW[:, mask] = 0
+    return XW
+
+
+def _get_aug_XW(X, preds, hats):
+    rootW = np.sqrt(preds * (1 - preds) * (1 + hats))
+    XW = rootW[:, np.newaxis] * X
+    return XW
+
+
+def _hat_diag(XW):
+    # Get diagonal elements of the hat matrix
+    qr, tau, _, _ = scipy.linalg.lapack.dgeqrf(XW, overwrite_a=True)
+    Q, _, _ = scipy.linalg.lapack.dorgqr(qr, tau, overwrite_a=True)
+    hat = np.einsum("ij,ij->i", Q, Q)
+    return hat
+
+
+def _bse(X, coefs):
+    # se in logistf is diag(object$var) ^ 0.5, where var is the covariance matrix,
+    # which is the inverse of the observed fisher information matrix
+    # https://stats.stackexchange.com/q/68080/343314
+    preds = scipy.special.expit(X @ coefs)
+    XW = _get_XW(X, preds)
+    fisher_info_mtx = XW.T @ XW
+    return np.sqrt(np.diag(np.linalg.pinv(fisher_info_mtx)))
+
+
+def _penalized_lrt(
+        full_loglik, X, y, max_iter, max_stepsize, max_halfstep, tol, test_vars
+):
+    if test_vars is None:
+        test_var_indices = range(X.shape[1])
+    elif isinstance(test_vars, int):  # single index
+        test_var_indices = [test_vars]
+    else:  # list, tuple, or set of indices
+        test_var_indices = sorted(test_vars)
+
+    pvals = []
+    for mask in test_var_indices:
+        _, null_loglik, _, _ = _firth_newton_raphson(
+            X,
+            y,
+            max_iter,
+            max_stepsize,
+            max_halfstep,
+            tol,
+            mask,
+        )
+        pvals.append(_lrt(full_loglik, null_loglik))
+    if len(pvals) < X.shape[1]:
+        pval_array = np.full(X.shape[1], np.nan)
+        for idx, test_var_idx in enumerate(test_var_indices):
+            pval_array[test_var_idx] = pvals[idx]
+        return pval_array
+    return np.array(pvals)
+
+
+def _lrt(full_loglik, null_loglik):
+    # in logistf: 1-pchisq(2*(fit.full$loglik-fit.i$loglik),1)
+    lr_stat = 2 * (full_loglik - null_loglik)
+    p_value = chi2.sf(lr_stat, df=1)
+    return p_value
+
+
+def _predict(X, coef):
+    preds = scipy.special.expit(X @ coef)
+    np.clip(preds, a_min=1e-15, a_max=1 - 1e-15, out=preds)
+    return preds
+
+
+def _profile_likelihood_ci(
+        X,
+        y,
+        fitted_coef,
+        full_loglik,
+        max_iter,
+        max_stepsize,
+        max_halfstep,
+        tol,
+        alpha,
+        test_vars,
+):
+    LL0 = full_loglik - chi2.ppf(1 - alpha, 1) / 2
+    lower_bound = []
+    upper_bound = []
+    if test_vars is None:
+        test_var_indices = range(fitted_coef.shape[0])
+    elif isinstance(test_vars, int):  # single index
+        test_var_indices = [test_vars]
+    else:  # list, tuple, or set of indices
+        test_var_indices = sorted(test_vars)
+    for side in [-1, 1]:
+        # for coef_idx in range(fitted_coef.shape[0]):
+        for coef_idx in test_var_indices:
+            coef = deepcopy(fitted_coef)
+            for iter in range(1, max_iter + 1):
+                preds = _predict(X, coef)
+                loglike = -_loglikelihood(X, y, preds)
+                XW = _get_XW(X, preds)
+                hat = _hat_diag(XW)
+                XW = _get_aug_XW(X, preds, hat)  # augmented data using hat diag
+                fisher_info_mtx = XW.T @ XW
+                U_star = np.matmul(X.T, y - preds + np.multiply(hat, 0.5 - preds))
+                # https://github.com/georgheinze/logistf/blob/master/src/logistf.c#L780-L781
+                inv_fisher = np.linalg.pinv(fisher_info_mtx)
+                tmp1x1 = U_star @ np.negative(inv_fisher) @ U_star
+                underRoot = (
+                        -2
+                        * ((LL0 - loglike) + 0.5 * tmp1x1)
+                        / (inv_fisher[coef_idx, coef_idx])
+                )
+                lambda_ = 0 if underRoot < 0 else side * sqrt(underRoot)
+                U_star[coef_idx] += lambda_
+
+                step_size = np.linalg.lstsq(fisher_info_mtx, U_star, rcond=None)[0]
+                mx = np.max(np.abs(step_size)) / max_stepsize
+                if mx > 1:
+                    step_size = step_size / mx  # restrict to max_stepsize
+                coef += step_size
+                loglike_old = deepcopy(loglike)
+
+                for halfs in range(1, max_halfstep + 1):
+                    preds = _predict(X, coef)
+                    loglike = -_loglikelihood(X, y, preds)
+                    if (abs(loglike - LL0) < abs(loglike_old - LL0)) and loglike > LL0:
+                        break
+                    step_size *= 0.5
+                    coef -= step_size
+                if abs(loglike - LL0) <= tol:
+                    if side == -1:
+                        lower_bound.append(coef[coef_idx])
+                    else:
+                        upper_bound.append(coef[coef_idx])
+                    break
+            if abs(loglike - LL0) > tol:
+                if side == -1:
+                    lower_bound.append(np.nan)
+                else:
+                    upper_bound.append(np.nan)
+                warning_msg = (
+                    f"Non-converged PL confidence limits - max number of "
+                    f"iterations exceeded for variable x{coef_idx}. Try "
+                    f"increasing pl_max_iter."
+                )
+                warnings.warn(warning_msg, ConvergenceWarning, stacklevel=2)
+    bounds = np.column_stack([lower_bound, upper_bound])
+    if len(lower_bound) < fitted_coef.shape[0]:
+        ci = np.full([fitted_coef.shape[0], 2], np.nan)
+        for idx, test_var_idx in enumerate(test_var_indices):
+            ci[test_var_idx] = bounds[idx]
+        return ci
+
+    return bounds
+
+
+def _wald_ci(coef, bse, alpha):
+    lower_ci = coef + norm.ppf(alpha / 2) * bse
+    upper_ci = coef + norm.ppf(1 - alpha / 2) * bse
+    return np.column_stack([lower_ci, upper_ci])
+
+
+def _wald_test(coef, bse):
+    # 1 - pchisq((beta^2/vars), 1), in our case bse = vars^0.5
+    return chi2.sf(np.square(coef) / np.square(bse), 1)
+
+
+def load_sex2():
+    """
+    Load the sex2 dataset from `logistf`.
+
+    Returns
+    -------
+    X
+        sex2 data as numpy array
+    y
+        sex2 `case` target column
+    feature_names
+        List of feature names
+
+    References
+    ----------
+    Cytel Inc., (2010) LogXact 9 user manual, Cambridge, MA:Cytel Inc
+    """
+    with open_text("firthlogist.datasets", "sex2.csv") as sex2:
+        X = np.loadtxt(sex2, skiprows=1, delimiter=",")
+    y = X[:, 0]
+    X = X[:, 1:]
+    feature_names = ["age", "oc", "vic", "vicl", "vis", "dia"]
+    return X, y, feature_names
+
+
+def load_endometrial():
+    """
+    Load the endometrial cancer dataset analyzed in Heinze and Schemper (2002). The data
+    was originally provided by Dr E. Asseryanis from the Vienna University Medical
+    School
+
+    Returns
+    -------
+    X
+        endometrial data as numpy array
+    y
+        endometrial `HG` target column
+    feature_names
+        List of feature names
+
+    References
+    ----------
+    Agresti, A (2015). Foundations of Linear and Generalized Linear Models.
+    Wiley Series in Probability and Statistics.
+
+    Heinze G, Schemper M (2002). A solution to the problem of separation in logistic
+    regression. Statistics in Medicine 21: 2409-2419.
+    """
+    with open_text("firthlogist.datasets", "endometrial.csv") as sex2:
+        X = np.loadtxt(sex2, skiprows=1, delimiter=",")
+    y = X[:, -1]
+    X = X[:, :-1]
+    feature_names = ["NV", "PI", "EH"]
+    return X, y, feature_names
+
+
+
+# %% {"tags": []}
+from statsmodels.regression.linear_model import (
+    RegressionModel,
+    RegressionResults,
+)
+
+class Statsmodels_FirthLogisticRegression(RegressionModel):
+    """
+    Logistic regression with Firth's bias reduction method.
+
+    """
+
+    def __init__(self, endog, exog, column_names, **kwargs):
+        super().__init__(endog, exog, **kwargs)
+
+        self.model = FirthLogisticRegression(**kwargs, skip_pvals=False, skip_ci=True, wald=True, fit_intercept=False)
+        self.column_names = column_names
+
+    def fit(self, *args, **kwargs):
+        self.model.fit(self.exog, self.endog)
+        return self
+
+    def whiten(self, data):
+        return data
+
+    def loglike(self, params):
+        XW = _get_XW(self.exog, params)
+        return _loglikelihood(self.exog, self.endog, preds=XW)
+
+    # def score(self, params):
+    #     pass
+    #
+    # def information(self, params):
+    #     pass
+    #
+    # def hessian(self, params):
+    #     pass
+
+    @property
+    def llf(self):
+        return self.model.loglik_
+
+    @property
+    def mle_retvals(self):
+        return {
+            "converged": self.model.has_converged_
+        }
+
+    @property
+    def null(self):
+        """
+        Fitted values of the null model
+        """
+        endog = self.endog
+        model = self.model
+        exog = np.ones((len(endog), 1))
+
+        fitted = FirthLogisticRegression(skip_pvals=True, skip_ci=True, fit_intercept=False).fit(exog, endog)
+
+        return fitted
+
+    @property
+    def llnull(self):
+        """
+        Log-likelihood of the model fit with a constant as the only regressor
+        """
+        return self.null.loglik_
+
+    @property
+    def prsquared(self):
+        prsq = 1 - np.exp((self.llnull - self.llf) * (2 / self.nobs))
+        return prsq
+    
+    @property
+    def pvalues(self):
+        retval = pd.Series(self.model.pvals_, index=self.column_names)
+        return retval
+
+    @property
+    def params(self):
+        retval = pd.Series(self.model.coef_, index=self.column_names)
+        return retval
+
+
+
+# %%
+def firth_regression(formula, data):
+    from patsy import dmatrices
+    y, X = dmatrices(formula, data)
+    
+    fl = Statsmodels_FirthLogisticRegression(y, X, column_names=X.design_info.column_names, max_iter=200).fit()
+    
+    return fl
+
+
+# %% {"tags": []}
+import statsmodels.formula.api as smf
+import sklearn
+
+from threadpoolctl import threadpool_limits
+from typing import List, Union
+
+def fit(
+    pd_df,
+    groupby_columns: List[str],
+    full_formula: str,
+    restricted_formula: str,
+    covariates_df: pd.DataFrame,
+    clumping_variants_df: pd.DataFrame = None,
+    add_clumping: bool = config["covariates"]["add_clumping"],
+    boolean_regression: bool = is_boolean_dtype,
+    enable_firth_regression=True,
+    normalize_features=True,
+):
+    keys=pd_df.loc[:, groupby_columns].iloc[0].to_dict()
+
+    formatted_restricted_formula = format_formula(
+        formula=restricted_formula,
+        keys=keys,
+        add_clumping=add_clumping,
+        clumping_variants_df=clumping_variants_df,
+    )
+    formatted_full_formula = format_formula(
+        formula=full_formula,
+        keys=keys,
+        add_clumping=add_clumping,
+        clumping_variants_df=clumping_variants_df,
+    )
+
+    # get necessary columns
+    restricted_variables = get_variables_from_formula(formatted_restricted_formula)
+    full_variables = get_variables_from_formula(formatted_full_formula)
+    target_variables = get_variables_from_formula(formatted_restricted_formula, rhs=False)
+    necessary_columns = {
+        *restricted_variables,
+        *full_variables,
+        "individual",
+    }
+
+    # subset to necessary columns
+    covariates_df = covariates_df[
+        [c for c in covariates_df_columns if c in necessary_columns]
+    ]
+
+    # merge with phenotype df to make sure that we have all scores predicted
+    data_df = covariates_df.merge(pd_df, on=["individual"], how="left")
+    # fill missing values
+    data_df = data_df.fillna({
+        c: 0 for c in pd_df.columns
+    })
+    if normalize_features:
+        data_df = data_df.assign(**{
+            col: sklearn.preprocessing.StandardScaler().fit_transform(data_df[[col]])[:, 0] for col in full_variables if col in pd_df.columns
+        })
+    # cast phenotype to float
+    for tv in target_variables:
+        data_df = data_df.assign(**{
+            tv: data_df[tv].astype("float32")
+        })
+    
+    assert necessary_columns.issubset(data_df.columns), f"Missing columns in merged dataframe: '{necessary_columns.difference(data_df.columns)}'"
+    
+    try:
+        if boolean_regression:
+            restricted_model = firth_regression(
+                formatted_restricted_formula,
+                data = data_df
+            )
+            full_model = firth_regression(
+                formatted_full_formula,
+                data = data_df
+            )
+#             converged = False
+#             try:
+#                 restricted_model = smf.logit(
+#                     formatted_restricted_formula,
+#                     data = data_df
+#                 ).fit(maxiter=200, disp=0, warn_convergence=False)
+
+#                 full_model = smf.logit(
+#                     formatted_full_formula,
+#                     data = data_df
+#                 ).fit(maxiter=200, disp=0, warn_convergence=False)
+
+#                 converged = restricted_model.mle_retvals["converged"] & full_model.mle_retvals["converged"]
+#             except np.linalg.LinAlgError as linalg_error:
+#                 # newton failed
+#                 pass
+
+#             if not converged:
+#                 # retry with l-bfgs-b
+#                 print("retry with l-bfgs-b")
+#                 restricted_model = smf.logit(
+#                     formatted_restricted_formula,
+#                     data = data_df
+#                 ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
+
+#                 full_model = smf.logit(
+#                     formatted_full_formula,
+#                     data = data_df
+#                 ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
+
+            # calculate statistics
+            lr_stat, lr_pval, lr_df_diff = lr_test(restricted_model, full_model)
+            restricted_model_converged = restricted_model.mle_retvals["converged"]
+            rsquared_restricted = prsquared_adj(restricted_model)
+            rsquared_restricted_raw = restricted_model.prsquared
+            full_model_converged = full_model.mle_retvals["converged"]
+            rsquared = prsquared_adj(full_model)
+            rsquared_raw = full_model.prsquared
+        else:
+            restricted_model = smf.ols(
+                formatted_restricted_formula,
+                data = data_df
+            ).fit()
+
+            full_model = smf.ols(
+                formatted_full_formula,
+                data = data_df
+            ).fit()
+
+            # calculate statistics
+            lr_stat, lr_pval, lr_df_diff = full_model.compare_lr_test(restricted_model)
+            restricted_model_converged = True
+            rsquared_restricted = restricted_model.rsquared_adj
+            rsquared_restricted_raw = restricted_model.rsquared
+            full_model_converged = True
+            rsquared = full_model.rsquared_adj
+            rsquared_raw = full_model.rsquared
+
+    except Exception as e:
+        print("---------------- error log -----------------")
+        print("keys:")
+        print(keys)
+        print("-------------- error log end ---------------")
+        raise e
+
+    return (
+        pd_df
+        .loc[:, groupby_columns]
+        .iloc[:1]
+        .copy()
+        .assign(**{
+            "n_observations": [int(full_model.nobs)],
+            "term_pvals": [full_model.pvalues.to_dict()], 
+            "params": [full_model.params.to_dict()],
+            "restricted_model_converged": [restricted_model_converged],
+            "full_model_converged": [full_model_converged],
+            "restricted_model_llf": [restricted_model.llf],
+            "full_model_llf": [full_model.llf],
+            "rsquared_restricted": [rsquared_restricted],
+            "rsquared_restricted_raw": [rsquared_restricted_raw],
+            "rsquared": [rsquared],
+            "rsquared_raw": [rsquared_raw],
+            "lr_stat": [lr_stat],
+            "lr_pval": [lr_pval],
+            "lr_df_diff": [lr_df_diff],
+        })
+    )
+
+
+# %% [raw]
+# fit(
+#     pd_df=covariates_df.select("individual").collect().to_pandas().assign(gene="ENSG00000084674"),
+#     groupby_columns=["gene"],
+#     full_formula=restricted_formula,
+#     restricted_formula=restricted_formula,
+#     # covariates_df=broadcast_covariates_df,
+#     covariates_df=normalized_covariates_df,
+#     clumping_variants_df=clumping_variants_df,
+# )
+
+# %% [raw]
+# fit(
+#     pd_df=covariates_df.select("individual").collect().to_pandas().assign(gene="ENSG00000084674"),
+#     groupby_columns=["gene"],
+#     restricted_formula='Asthma ~ 1\n + genetic_principal_components_f22009_0_1\n + genetic_principal_components_f22009_0_2\n + genetic_principal_components_f22009_0_3\n + genetic_principal_components_f22009_0_4\n + genetic_principal_components_f22009_0_5\n + genetic_principal_components_f22009_0_6\n + genetic_principal_components_f22009_0_7\n + genetic_principal_components_f22009_0_8\n + genetic_principal_components_f22009_0_9\n + genetic_principal_components_f22009_0_10\n + genetic_principal_components_f22009_0_11\n + genetic_principal_components_f22009_0_12\n + genetic_principal_components_f22009_0_13\n + genetic_principal_components_f22009_0_14\n + genetic_principal_components_f22009_0_15\n + genetic_principal_components_f22009_0_16\n + genetic_principal_components_f22009_0_17\n + genetic_principal_components_f22009_0_18\n + genetic_principal_components_f22009_0_19\n + genetic_principal_components_f22009_0_20\n + genetic_principal_components_f22009_0_21\n + genetic_principal_components_f22009_0_22\n + genetic_principal_components_f22009_0_23\n + genetic_principal_components_f22009_0_24\n + genetic_principal_components_f22009_0_25\n + genetic_principal_components_f22009_0_26\n + genetic_principal_components_f22009_0_27\n + genetic_principal_components_f22009_0_28\n + genetic_principal_components_f22009_0_29\n + genetic_principal_components_f22009_0_30\n + PGS001849',
+#     full_formula=restricted_formula,
+#     # covariates_df=broadcast_covariates_df,
+#     covariates_df=covariates_df.collect().to_pandas(),
+#     clumping_variants_df=clumping_variants_df,
+# )
+
+# %% {"tags": []}
 import statsmodels.formula.api as smf
 
 from threadpoolctl import threadpool_limits
@@ -391,42 +1319,40 @@ def regression(
     groupby_columns: Union[str, List[str]], 
     full_formula: str,
     restricted_formula: str,
-    # covariates_df: Union[pyspark.Broadcast, pd.DataFrame],
+    covariates_df: pd.DataFrame,
     clumping_variants_df: Union[pyspark.Broadcast, pd.DataFrame] = None,
     add_clumping: bool = config["covariates"]["add_clumping"],
-    boolean_regression=is_boolean_dtype,
+    boolean_regression: bool = is_boolean_dtype,
 ):
     if isinstance(groupby_columns, str):
         groupby_columns = [groupby_columns]
     
     print("broadcasting...")
-    # make sure to use broadcasted variable
-    # broadcast_covariates_df = broadcast(covariates_df, idempotent=True)
     
     if add_clumping:
         broadcast_clumping_variants_df = broadcast(clumping_variants_df, idempotent=True)
     else:
         broadcast_clumping_variants_df = None
     
+    broadcast_covariates_df = spark_broadcast_feather(covariates_df)
+    
     print("broadcasting done")
     
-    def fit(pd_df):
+    def spark_fit_parallel(pd_df):
         with threadpool_limits(limits=1):
-            keys=pd_df.loc[:, groupby_columns].iloc[0].to_dict()
-    
             # print("dereferencing...")
             
-            # ## unpack all broadcast variables
-            # covariates_df = deref(broadcast_covariates_df)
-            
-            # unpack only if needed
+            # unpack the clumping variant annotation if needed
             if add_clumping:
                 clumping_variants_df = deref(broadcast_clumping_variants_df)
             else:
                 clumping_variants_df = None
-            # ## unpacking done
             
             # print("dereferencing done")
+            
+            # Now compute all necessary columns that need to be loaded into memory.
+            # Therefore we need to first get all required formula terms
+            keys=pd_df.loc[:, groupby_columns].iloc[0].to_dict()
             
             formatted_restricted_formula = format_formula(
                 formula=restricted_formula,
@@ -445,125 +1371,38 @@ def regression(
             restricted_variables = get_variables_from_formula(formatted_restricted_formula)
             full_variables = get_variables_from_formula(formatted_full_formula)
             target_variables = get_variables_from_formula(formatted_restricted_formula, rhs=False)
+            # Necessary are the union of all term variables and the individual
             necessary_columns = {
                 *restricted_variables,
                 *full_variables,
                 "individual",
             }
             
-            # make sure to use memory-mapping and disable threading
+            # Now load only the necessary columns into memory.
+            # Make sure to use memory-mapping and disable threading.
             covariates_df = feather.read_feather(
-                pyspark.SparkFiles.get(covariates_sparkfilename),
+                get_sparkfile_path(broadcast_covariates_df),
                 columns=[c for c in covariates_df_columns if c in necessary_columns],
                 use_threads=False,
                 memory_map=True
             )
             
-            # merge with phenotype df to make sure that we have all scores predicted
-            data_df = covariates_df.merge(pd_df, on=["individual"], how="left")
-            # fill missing values
-            data_df = data_df.fillna({
-                c: 0 for c in pd_df.columns
-            })
-            # cast phenotype to float
-            for tv in target_variables:
-                data_df = data_df.assign(**{
-                    tv: data_df[tv].astype("float32")
-                })
-            
-            
-            try:
-                if boolean_regression:
-                    converged = False
-                    try:
-                        restricted_model = smf.logit(
-                            formatted_restricted_formula,
-                            data = data_df
-                        ).fit(maxiter=200, disp=0, warn_convergence=False)
-
-                        full_model = smf.logit(
-                            formatted_full_formula,
-                            data = data_df
-                        ).fit(maxiter=200, disp=0, warn_convergence=False)
-
-                        converged = restricted_model.mle_retvals["converged"] & full_model.mle_retvals["converged"]
-                    except np.linalg.LinAlgError as linalg_error:
-                        # newton failed
-                        pass
-
-                    if not converged:
-                        # retry with l-bfgs-b
-                        # print("retry with l-bfgs-b")
-                        restricted_model = smf.logit(
-                            formatted_restricted_formula,
-                            data = data_df
-                        ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
-
-                        full_model = smf.logit(
-                            formatted_full_formula,
-                            data = data_df
-                        ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
-
-                    # calculate statistics
-                    lr_stat, lr_pval, lr_df_diff = lr_test(restricted_model, full_model)
-                    restricted_model_converged = restricted_model.mle_retvals["converged"]
-                    rsquared_restricted = prsquared_adj(restricted_model)
-                    rsquared_restricted_raw = restricted_model.prsquared
-                    full_model_converged = full_model.mle_retvals["converged"]
-                    rsquared = prsquared_adj(full_model)
-                    rsquared_raw = full_model.prsquared
-                else:
-                    restricted_model = smf.ols(
-                        formatted_restricted_formula,
-                        data = data_df
-                    ).fit()
-
-                    full_model = smf.ols(
-                        formatted_full_formula,
-                        data = data_df
-                    ).fit()
-
-                    # calculate statistics
-                    lr_stat, lr_pval, lr_df_diff = full_model.compare_lr_test(restricted_model)
-                    restricted_model_converged = True
-                    rsquared_restricted = restricted_model.rsquared_adj
-                    rsquared_restricted_raw = restricted_model.rsquared
-                    full_model_converged = True
-                    rsquared = full_model.rsquared_adj
-                    rsquared_raw = full_model.rsquared
-                
-            except Exception as e:
-                print("---------------- error log -----------------")
-                print("keys:")
-                print(keys)
-                print("-------------- error log end ---------------")
-                raise e
-
-            return (
-                pd_df
-                .loc[:, groupby_columns]
-                .iloc[:1]
-                .copy()
-                .assign(**{
-                    "n_observations": [int(full_model.nobs)],
-                    "term_pvals": [full_model.pvalues.to_dict()], 
-                    "params": [full_model.params.to_dict()],
-                    "restricted_model_converged": [restricted_model_converged],
-                    "full_model_converged": [full_model_converged],
-                    "restricted_model_llf": [restricted_model.llf],
-                    "full_model_llf": [full_model.llf],
-                    "rsquared_restricted": [rsquared_restricted],
-                    "rsquared_restricted_raw": [rsquared_restricted_raw],
-                    "rsquared": [rsquared],
-                    "rsquared_raw": [rsquared_raw],
-                    "lr_stat": [lr_stat],
-                    "lr_pval": [lr_pval],
-                    "lr_df_diff": [lr_df_diff],
-                })
+            # Finally, pass data to the fit function
+            retval = fit(
+                pd_df,
+                groupby_columns=groupby_columns,
+                full_formula=full_formula,
+                restricted_formula=restricted_formula,
+                covariates_df=covariates_df,
+                clumping_variants_df=clumping_variants_df,
+                add_clumping=add_clumping,
+                boolean_regression=boolean_regression,
             )
+
+            return retval
     
     return dataframe.groupby(groupby_columns).applyInPandas(
-        func=fit,
+        func=spark_fit_parallel,
         schema=t.StructType([
             *[dataframe.schema[k] for k in groupby_columns],
             t.StructField("n_observations", t.LongType()),
@@ -588,7 +1427,7 @@ _test = regression(
     groupby_columns=["gene"],
     full_formula=restricted_formula,
     restricted_formula=restricted_formula,
-    # covariates_df=broadcast_covariates_df,
+    covariates_df=normalized_covariates_df,
     clumping_variants_df=broadcast_clumping_variants_df,
 ).toPandas()
 
@@ -711,12 +1550,13 @@ full_formula = "\n + ".join([
 print(full_formula)
 
 # %%
+# TODO: Always use `covariates_df=normalized_covariates_df`?
 regression_results_sdf = regression(
     renamed_features_df, 
     groupby_columns=groupby_columns, 
     full_formula=full_formula,
     restricted_formula=restricted_formula,
-    # covariates_df=broadcast_covariates_df,
+    covariates_df=normalized_covariates_df,
     clumping_variants_df=broadcast_clumping_variants_df,
 )
 regression_results_sdf.printSchema()
@@ -739,6 +1579,15 @@ regression_results_sdf.printSchema()
 
 # %% [raw]
 # gene_list = ['ENSG00000004059']
+# gene_list = ['ENSG00000004059', 'ENSG00000171505']
+# gene_list = [
+#     'ENSG00000183706',
+#     'ENSG00000185386',
+#     'ENSG00000205238',
+#     'ENSG00000285472',
+#     'ENSG00000120280',
+#     'ENSG00000176679',
+# ]
 
 # %% [raw]
 # %%time
@@ -749,9 +1598,46 @@ regression_results_sdf.printSchema()
 #     groupby_columns=groupby_columns, 
 #     full_formula=full_formula,
 #     restricted_formula=restricted_formula,
-#     # covariates_df=broadcast_covariates_df,
+#     covariates_df=normalized_covariates_df,
 #     clumping_variants_df=broadcast_clumping_variants_df,
 # ).toPandas()
+# test
+
+# %% [raw]
+# test_df = renamed_features_df.filter(f.col("gene").isin(
+#     # ['ENSG00000171505']
+#     ['ENSG00000205238']
+# )).toPandas()
+# test_df
+
+# %% [raw]
+# %%time
+# test = fit(
+#     test_df, 
+#     groupby_columns=groupby_columns, 
+#     full_formula=full_formula,
+#     restricted_formula=restricted_formula,
+#     covariates_df=normalized_covariates_df,
+#     clumping_variants_df=clumping_variants_df,
+# )
+# test
+
+# %% [raw]
+# normalized_test_df = test_df.assign(**{
+#     col: sklearn.preprocessing.StandardScaler().fit_transform(test_df[[col]])[:, 0] for col in features
+# })
+# normalized_test_df
+
+# %% [raw]
+# %%time
+# test = fit(
+#     normalized_test_df, 
+#     groupby_columns=groupby_columns, 
+#     full_formula=full_formula,
+#     restricted_formula=restricted_formula,
+#     covariates_df=normalized_covariates_df,
+#     clumping_variants_df=clumping_variants_df,
+# )
 # test
 
 # %%
@@ -785,4 +1671,7 @@ regression_results_sdf.write.parquet(snakemake.output["associations_pq"], mode="
 # regression_results_df
 
 # %%
+tmpdir.cleanup()
 
+
+# %%

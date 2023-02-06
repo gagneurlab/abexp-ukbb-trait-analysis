@@ -13,3 +13,4 @@ severe_LDL,PGS001933,"/s/project/uk_biobank/processed/risk_scores/PGS001933/PGS0
 CAD_HARD,PGS001839,"/s/project/uk_biobank/processed/risk_scores/PGS001839/PGS001839.sscore","/s/project/uk_biobank/processed/clumping/411.4/GWAS_variants_clumped_mac.parquet","CAD_custom"
 CAD_SOFT,PGS001839,"/s/project/uk_biobank/processed/risk_scores/PGS001839/PGS001839.sscore","/s/project/uk_biobank/processed/clumping/411.4/GWAS_variants_clumped_mac.parquet","CAD_custom"
 glycated_haemoglobin_hba1c,PGS001953,"/s/project/uk_biobank/processed/risk_scores/PGS001953/PGS001953.sscore","/s/project/uk_biobank/processed/clumping/30750/GWAS_variants_clumped_mac.parquet","30750"
+Lipoprotein_A,PGS001963,"/s/project/uk_biobank/processed/risk_scores/PGS001963/PGS001963.sscore","/s/project/uk_biobank/processed/clumping/30790/GWAS_variants_clumped_mac.parquet","30790"

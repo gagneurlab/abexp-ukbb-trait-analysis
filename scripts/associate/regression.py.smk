@@ -12,8 +12,8 @@ TEMPLATE_FILE=f"{SNAKEFILE_DIR}/regression@{{feature_set}}.yaml"
 rule associate__regression:
     threads: 64
     resources:
-        mem_mb=lambda wildcards, attempt, threads: (8000 * threads) * attempt,
-        smt=0,
+        mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt,
+        smt=lambda wildcards, attempt, threads: 1 if (attempt > 1) else 0,
     output:
         associations_pq=directory(OUTPUT_BASEPATH + "/associations.parquet"),
         # config=f"{OUTPUT_BASEPATH}/config.yaml",

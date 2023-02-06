@@ -24,7 +24,7 @@ rule covariates:
         samples_pq_done=f"{COVARIATES_BASEPATH}/samples.parquet.done",
         decoded_phenotype_pq=f"{UKBB_DECODED_PHENOTYPES_DIR}/{{phenotype_col}}/data.parquet",
         phenotype_metadata_pq=f"{UKBB_PROCESSED_PHENOTYPES_DIR}/latest.meta.parquet",
-        covariates_config=TEMPLATE_FILE,
+        covariates_config=ancient(TEMPLATE_FILE),
         # clumping
         # mac_index_variants=config["mac_index_variants"],
         clumping_genome_annotation=config["clumping_gtf_file"],

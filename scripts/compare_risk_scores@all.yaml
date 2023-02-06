@@ -9,10 +9,10 @@ phenotypes:
 # - "systolic_blood_pressure"
 
 covariates:
-- "sex_age_genPC"
-- "sex_age_genPC_CLMP"
+# - "sex_age_genPC"
+# - "sex_age_genPC_CLMP"
 - "sex_age_genPC_CLMP_PRS"
-- "randomized_sex_age_genPC_CLMP_PRS"
+# - "randomized_sex_age_genPC_CLMP_PRS"
 
 features_sets:
 - "LOFTEE_pLoF"
