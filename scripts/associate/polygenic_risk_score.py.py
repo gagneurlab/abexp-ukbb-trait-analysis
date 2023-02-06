@@ -103,13 +103,13 @@ except NameError:
             #"phenotype_col": "glycated_haemoglobin_hba1c",
             #"phenotype_col": "Lipoprotein_A",
             #"phenotype_col": "BodyMassIndex",
-            #"phenotype_col": "Triglycerides",
+            "phenotype_col": "Triglycerides",
             #"phenotype_col": "LDL_direct",
             #"phenotype_col": "systolic_blood_pressure",
             #"phenotype_col": "HDL_cholesterol",
             #"feature_set": "LOFTEE_pLoF",
-            #"feature_set": "AbExp_all_tissues",
-            "feature_set": "LOFTEE_pLoF",
+            "feature_set": "AbExp_all_tissues",
+            #"feature_set": "LOFTEE_pLoF",
             "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex_age_genPC_CLMP",
             # "covariates": "sex_age_genPC",
@@ -1011,13 +1011,13 @@ prc_df.query(f"method=='Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}'").t
 # %% [raw]
 # test_df
 
-# %% [raw]
-# abexp_variables = [c for c in test_df.columns if "@AbExp" in c]
-# plot_df = test_df[[c for c in test_df.columns if c in ["individual"]+abexp_variables]]
-# plot_df = pd.melt(plot_df, id_vars=["individual"], value_vars=list(set(abexp_variables).intersection(set(plot_df.columns)))).rename(columns={"value": "score"})
-# plot_df[["gene_id", "score_type"]] = plot_df["variable"].str.split("@",expand=True)
-# plot_df["gene_symbol"] = plot_df["gene_id"]
-# plot_df = pd.merge(plot_df, pred_df[["individual", "residuals_restricted"]])
+# %%
+abexp_variables = [c for c in test_df.columns if "@AbExp" in c]
+plot_df = test_df[[c for c in test_df.columns if c in ["individual"]+abexp_variables]]
+plot_df = pd.melt(plot_df, id_vars=["individual"], value_vars=list(set(abexp_variables).intersection(set(plot_df.columns)))).rename(columns={"value": "score"})
+plot_df[["gene_id", "score_type"]] = plot_df["variable"].str.split("@",expand=True)
+plot_df["gene_symbol"] = plot_df["gene_id"]
+plot_df = pd.merge(plot_df, pred_df[["individual", "residuals_restricted"]])
 
 # %% [raw]
 # plot = (
@@ -1032,20 +1032,22 @@ prc_df.query(f"method=='Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}'").t
 # )
 # plot
 
-# %% [raw]
-# plot_max_df = plot_df.loc[plot_df.groupby(["individual", "gene_id"])['score'].idxmax()].rename(columns={"residuals_restricted": "residual"})
-# plot_max_df["score_type"] = "AbExp_max"
-# plot = (
-#     pn.ggplot(plot_max_df, pn.aes(x="score", y="residual"))
-#     + pn.stat_bin2d(bins=100)
-#     + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
-#     + pn.facet_grid("gene_symbol ~ score_type", scales="free_x")
-#     + pn.theme(aspect_ratio=1/2)
-#     + pn.ggtitle(f"Residuals of common PRS and {phenotype_col} vs. AbExpMax")
-#     + pn.theme(title = pn.element_text(va = "top", linespacing = 8))
-# )
-# pn.ggsave(plot = plot, filename = f"../../plots/{phenotype_col}/LGBM_PRS_residuals_vs_AbExpMax.png", dpi=DPI)
-# plot
+# %%
+plot_max_df = plot_df.loc[plot_df.groupby(["individual", "gene_id"])['score'].idxmax()].rename(columns={"residuals_restricted": "residual"})
+plot_max_df["score_type"] = "AbExp_max"
+plot = (
+    pn.ggplot(plot_max_df, pn.aes(x="score", y="residual"))
+    + pn.stat_bin2d(bins=100)
+    + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
+    #+ pn.facet_grid("gene_symbol ~ score_type", scales="free_x")
+    + pn.facet_wrap("gene_symbol")
+    + pn.theme(aspect_ratio=1/2)
+    + pn.theme(figure_size=(12, 12))
+    + pn.ggtitle(f"Residuals of common PRS and {phenotype_col} vs. AbExpMax")
+    #+ pn.theme(title = pn.element_text(va = "top", linespacing = 8))
+)
+pn.ggsave(plot = plot, filename = f"../../plots/{phenotype_col}/LGBM_PRS_residuals_vs_AbExpMax.png", dpi=DPI)
+plot
 
 # %% [raw]
 # snakemake.params["output_basedir"]
