@@ -13,7 +13,7 @@ include: 'snakefile_utils.smk'
 # config['wBuildPath'] =  str(pathlib.Path(wbuild.__file__).parent)
 
 workdir: "./"
-configfile: "config_v3.yaml"
+configfile: "config_v4.yaml"
 
 # sync config directory
 eprint("Syncing config directory...")

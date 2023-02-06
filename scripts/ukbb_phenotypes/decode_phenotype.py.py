@@ -91,7 +91,10 @@ except NameError:
         default_wildcards={
             # "phenotype": "severe_LDL",
             # "phenotype": "Diabetes",
-            "phenotype": "standing_height",
+            # "phenotype": "standing_height",
+            # "phenotype": "HDL_cholesterol",
+            # "phenotype": "Triglycerides",
+            "phenotype": "BodyMassIndex",
             # "phenotype": "Asthma",
         }
     )

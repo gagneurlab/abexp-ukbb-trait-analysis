@@ -80,7 +80,9 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'compare_associations',
         default_wildcards={
-            "comparison": "all",
+            # "comparison": "all",
+            # "comparison": "paper_figure",
+            "comparison": "paper_figure_all_traits",
         }
     )
 
@@ -248,6 +250,10 @@ num_significant_associations.to_parquet(f"{path}.parquet", index=False)
 # %% [markdown]
 # ## Plot
 
+# %%
+feature_set_idx = pd.DataFrame({"feature_set": config["features_sets"][::-1]}).reset_index()
+feature_set_idx
+
 # %% [markdown]
 # ## barplot num. significants
 
@@ -269,15 +275,15 @@ plot_df = plot_df.assign(
         .astype("string[pyarrow]")
     ),
 )
-
+plot_df = plot_df.merge(feature_set_idx, on="feature_set", how="left")
 # crop_pvalue = 10 ** -10
 
 # %%
-plot_df
+plot_df 
 
 # %%
 plot = (
-    pn.ggplot(plot_df, pn.aes(x="feature_set", y="num_significant"))
+    pn.ggplot(plot_df, pn.aes(x="reorder(feature_set, index)", y="num_significant"))
     + pn.geom_bar(stat="identity")
     + pn.labs(
         # title=f"Number of ",
@@ -287,10 +293,10 @@ plot = (
     )
     # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
     + pn.theme(
-        figure_size=(8, 8),
+        figure_size=(12, 2 * len(config["covariates"])),
         axis_text_x=pn.element_text(
             rotation=45,
-            hjust=1
+            hjust=0.5
         ),
         strip_text_y=pn.element_text(
             rotation=0,
@@ -298,10 +304,11 @@ plot = (
         title=pn.element_text(linespacing=1.4),
     )
     + pn.facet_grid(
-        "phenotype_col ~ covariates",
-        scales="free_y"
+        "covariates ~ phenotype_col",
+        scales="free_x"
     )
-    # + pn.coord_flip()
+    # + pn.coord_cartesian()
+    + pn.coord_flip()
 )
 
 # %%
@@ -314,6 +321,75 @@ snakemake.params["output_basedir"]
 path = snakemake.params["output_basedir"] + "/num_significants"
 pn.ggsave(plot, path + ".png", dpi=DPI)
 pn.ggsave(plot, path + ".pdf", dpi=DPI)
+
+# %% [markdown]
+# ## scatter-plot num. significants
+
+# %%
+fig, ax = plt.subplots()
+matplotlib_venn.venn3(
+    (
+        set(combined_regression_results_df[combined_regression_results_df[snakemake.wildcards["feature_set"]] < pval_cutoff].index.get_level_values("gene")),
+        set(combined_regression_results_df[combined_regression_results_df["Genebass (300k WES)"] < pval_cutoff].index.get_level_values("gene")),
+        set(combined_regression_results_df[combined_regression_results_df["Genebass (500k WES)"] < pval_cutoff].index.get_level_values("gene")),
+    ),
+    set_labels = (snakemake.wildcards["feature_set"], "Genebass (300k WES)", "Genebass (500k WES)"),
+    ax=ax
+)
+display(ax)
+
+# %%
+plot_df = num_significant_associations.set_index(grouping)["num_significant"].unstack("feature_set").reset_index()
+# pretty-print some names
+plot_df = plot_df.assign(
+    covariates="covariates:\n" + plot_df["covariates"].str.replace("_", " + "),
+    phenotype_col=(
+        plot_df["phenotype_col"]
+        .str.replace(r"_(f\d+_.*)", r"\n(\1)", regex=True)
+        .str.split("\n")
+        # .str.replace(r"_", r" ", regex=True)
+        .apply(
+            lambda s: "\n".join([
+                textwrap.fill(s[0].replace("_", " "), 12, break_long_words=False),
+                *s[1:]
+            ])
+        )
+        .astype("string[pyarrow]")
+    ),
+)
+plot_df
+
+# %%
+import itertools
+
+for feature_x, feature_y in list(itertools.combinations(keys, 2)):
+    print(f"Plotting '{feature_x}' vs '{feature_y}'...")
+    
+    plot = (
+        pn.ggplot(plot_df, pn.aes(x=feature_x, y=feature_y, fill="phenotype_col"))
+        + pn.geom_point(size=3)
+        + pn.geom_abline(slope=1, color="black", linetype="dashed")
+        + pn.ggtitle(f"Number of significantly associating genes\n(p-values, alpha={pval_cutoff})")
+        + pn.theme(
+            figure_size=(6, 4),
+            axis_text_x=pn.element_text(
+                rotation=30,
+                # hjust=1
+            ),
+            strip_text_y=pn.element_text(
+                rotation=0,
+            ),
+            title=pn.element_text(linespacing=1.4),
+        )
+        + pn.facet_wrap("covariates")
+        # + pn.coord_equal()
+    )
+    
+    path = snakemake.params["output_basedir"] + f"/num_significants.scatter_plot@{feature_x}__vs__{feature_y}"
+    
+    print(f"Saving to '{path}'")
+    pn.ggsave(plot, path + ".png", dpi=DPI)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI)
 
 # %% [markdown]
 # ## boxplot
@@ -341,12 +417,13 @@ plot_df = plot_df.assign(
         .astype("string[pyarrow]")
     ),
 )
+plot_df = plot_df.merge(feature_set_idx, on="feature_set", how="left")
 
 # crop_pvalue = 10 ** -10
 
 # %%
 plot = (
-    pn.ggplot(plot_df, pn.aes(x="feature_set", y="rsquared_diff"))
+    pn.ggplot(plot_df, pn.aes(x="reorder(feature_set, index)", y="rsquared_diff"))
     # + pn.geom_abline(slope=1, color="black", linetype="dashed")
     # + pn.geom_hline(yintercept=0.05, color="red", linetype="dashed")
     # + pn.geom_vline(xintercept=0.05, color="red", linetype="dashed")
@@ -639,6 +716,24 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
         )
     )
     
+    # pretty-print some names
+    sub_plot_df = sub_plot_df.assign(
+        covariates=sub_plot_df["covariates"].str.replace("_", "\n+ "),
+        phenotype_col=(
+            sub_plot_df["phenotype_col"]
+            .str.replace(r"_(f\d+_.*)", r"\n(\1)", regex=True)
+            .str.split("\n")
+            # .str.replace(r"_", r" ", regex=True)
+            .apply(
+                lambda s: "\n".join([
+                    textwrap.fill(s[0].replace("_", " "), 12, break_long_words=False),
+                    *s[1:]
+                ])
+            )
+            .astype("string[pyarrow]")
+        ),
+    )
+
     plot = (
         scatter_plot_pval(
             sub_plot_df,
@@ -649,14 +744,19 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
             crop_pvalue=10 ** -10,
         )
         + pn.ggtitle(f"Comparison between '{feature_x}' and '{feature_y}'\n(p-values, alpha={pval_cutoff})")
-        + pn.facet_grid("phenotype_col ~ covariates")
+        + pn.facet_grid("covariates ~ phenotype_col")
         + pn.theme(
+            figure_size=(12, 2 * len(config["covariates"])),
             axis_text_x=pn.element_text(
                 rotation=30,
                 # hjust=1
             ),
+            strip_text_y=pn.element_text(
+                rotation=0,
+            ),
             title=pn.element_text(linespacing=1.4),
         )
+        + pn.coord_equal()
     )
     
     path = snakemake.params["output_basedir"] + f"/feature_comp.padj_cropped@{feature_x}__vs__{feature_y}"
@@ -666,5 +766,8 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
     pn.ggsave(plot, path + ".pdf", dpi=DPI)
 
 
+
+# %%
+snakemake.output
 
 # %%

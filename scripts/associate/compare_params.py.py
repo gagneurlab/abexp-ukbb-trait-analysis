@@ -76,10 +76,11 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__compare_params',
         default_wildcards={
-            "phenotype_col": "hdl_cholesterol_f30760_0_0",
+            "phenotype_col": "Asthma",
+            # "phenotype_col": "hdl_cholesterol_f30760_0_0",
             # "phenotype_col": "systolic_blood_pressure_automated_reading_f4080_0_0",
-            # "feature_set": "LOFTEE_pLoF",
-            "feature_set": "AbExp_all_tissues",
+            "feature_set": "LOFTEE_pLoF",
+            # "feature_set": "AbExp_all_tissues",
             # "covariates": "sex_age_genPC_CLMP_PRS",
             "covariates": "sex_age_genPC_CLMP",
         }

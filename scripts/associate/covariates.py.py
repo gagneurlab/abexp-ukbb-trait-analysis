@@ -55,7 +55,8 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'covariates',
         default_wildcards={
-            "phenotype_col": "Asthma",
+            # "phenotype_col": "Asthma",
+            "phenotype_col": "Lipoprotein_A",
             # "phenotype_col": "Diabetes",
             # "phenotype_col": "HDL_cholesterol",
             # "phenotype_col": "Triglycerides",
@@ -292,7 +293,44 @@ data_df = data_df.select([
 data_df.schema
 
 # %%
-data_df = data_df.collect().lazy()
+data_df = data_df.collect()
+
+# %% [raw]
+# ### quantile normalization
+
+# %% [raw]
+# import scipy.stats
+#
+# def irnt(col: pl.Series) -> np.array:
+#     """
+#     inverse rank normal transformation as used by PHESANT:
+#     https://github.com/MRCIEU/PHESANT/blob/3f4a65d7fe93aaf01f3a4a3f39843562612a8d65/WAS/testContinuous.r#L243-L249
+#     
+#     :param x: Pandas Series with the (continuous) input values
+#     :returns: irnt values
+#     """
+#     if col.is_float():
+#         numPhenos = (col.is_not_nan() & col.is_not_null()).sum()
+#     else:
+#         numPhenos = col.is_not_null().sum()
+#     
+#     quantilePheno = (col.rank() - 0.5) / numPhenos
+#     phenoIRNT = pl.Series(scipy.stats.norm.ppf(quantilePheno.to_numpy()))
+#     return phenoIRNT
+
+# %% [raw]
+# columns_to_normalize = config.get("quantile_norm", [])
+# columns_to_normalize
+
+# %% [raw]
+# data_df = data_df.with_columns([
+#     irnt(data_df[col]).alias(col) for col in columns_to_normalize
+# ])
+
+# %%
+
+# %%
+data_df = data_df.lazy()
 
 # %% [markdown] {"tags": []}
 # ## clumping

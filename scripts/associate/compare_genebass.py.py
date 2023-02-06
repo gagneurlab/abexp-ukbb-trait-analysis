@@ -478,6 +478,7 @@ stats_df = (
         "Genebass_500k_signif",
     ]], how="right")
     .sort_values("padj")
+    .assign(**snakemake.wildcards)
 )
 
 # %%

@@ -18,17 +18,18 @@ def _compare_risk_scores_input_fn(wildcards, yaml_path=YAML_PATH, feature_set_ba
     with open(yaml_path, "r") as fd:
         config=yaml.safe_load(fd)
     
-    input_files=expand(
-        feature_set_basepath + '/config.yaml',
-        phenotype_col=config["phenotypes"], 
-        feature_set=config["features_sets"],
-        covariates=config["covariates"],
-    )
-    
-    return {
-        "associations_pq": input_files,
+    input_files={
+        k: expand(
+            v,
+            # feature_set_basepath + '/config.yaml',
+            phenotype_col=config["phenotypes"], 
+            feature_set=config["features_sets"],
+            covariates=config["covariates"],
+        )
+        for k, v in rules.associate__polygenic_risk_score.output.items()
     }
-
+    
+    return input_files
 
 
 rule compare_risk_scores:

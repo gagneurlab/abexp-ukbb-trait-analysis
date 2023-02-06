@@ -1,12 +1,20 @@
 ---
 phenotypes:
+# - "Asthma"
+- "BodyMassIndex"
+# - "CAD_HARD"
+# - "CAD_SOFT"
+# - "c_reactive_protein"
+# - "Diabetes"
+- "glycated_haemoglobin_hba1c"
 - "HDL_cholesterol"
 - "LDL_direct"
-# - "c_reactive_protein_f30710_0_0"
-- "Triglycerides"
+- "Lipoprotein_A"
+# - "severe_hba1c"
+# - "severe_LDL"
 - "standing_height"
-- "BodyMassIndex"
-# - "systolic_blood_pressure"
+- "systolic_blood_pressure"
+- "Triglycerides"
 
 covariates:
 - "sex_age_genPC"
@@ -16,8 +24,8 @@ covariates:
 
 features_sets:
 - "LOFTEE_pLoF"
-- "AbExp_all_tissues"
 - "max_AbExp"
 - "median_AbExp"
+- "AbExp_all_tissues"
 
 pval_cutoff: 0.05

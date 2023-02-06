@@ -7,7 +7,7 @@ SCRIPT=os.path.basename(SNAKEFILE)[:-4]
 COVARIATES_BASEPATH=f'''{config["trait_associations"]}/cov={{covariates}}'''
 
 rule train_test_split:
-    threads: 48
+    threads: 8
     resources:
         mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
     output:
