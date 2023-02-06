@@ -39,6 +39,8 @@ import plotnine as pn
 import matplotlib
 import matplotlib.pyplot as plt
 
+import matplotlib_venn
+
 # %%
 import textwrap
 
@@ -323,20 +325,36 @@ pn.ggsave(plot, path + ".png", dpi=DPI)
 pn.ggsave(plot, path + ".pdf", dpi=DPI)
 
 # %% [markdown]
-# ## scatter-plot num. significants
+# ## Pairwise venn diagrams
 
 # %%
-fig, ax = plt.subplots()
-matplotlib_venn.venn3(
-    (
-        set(combined_regression_results_df[combined_regression_results_df[snakemake.wildcards["feature_set"]] < pval_cutoff].index.get_level_values("gene")),
-        set(combined_regression_results_df[combined_regression_results_df["Genebass (300k WES)"] < pval_cutoff].index.get_level_values("gene")),
-        set(combined_regression_results_df[combined_regression_results_df["Genebass (500k WES)"] < pval_cutoff].index.get_level_values("gene")),
-    ),
-    set_labels = (snakemake.wildcards["feature_set"], "Genebass (300k WES)", "Genebass (500k WES)"),
-    ax=ax
-)
-display(ax)
+import itertools
+
+keys = adj_regression_results_pd_df["feature_set"].unique().tolist()
+
+for feature_x, feature_y in list(itertools.combinations(keys, 2)):
+    print(f"Plotting '{feature_x}' vs '{feature_y}'...")
+    
+    # venn diagram
+    fig, ax = plt.subplots()
+    matplotlib_venn.venn2(
+        (
+            set(significant_associations_pd_df.query(f"`feature_set` == '{feature_x}'")["gene"].unique()),
+            set(significant_associations_pd_df.query(f"`feature_set` == '{feature_y}'")["gene"].unique()),
+        ),
+        set_labels = (feature_x, feature_y),
+        ax=ax
+    )
+    # display(ax)
+    
+    path = snakemake.params["output_basedir"] + f"/venn@{feature_x}__vs__{feature_y}"
+    
+    print(f"Saving to '{path}'")
+    fig.savefig(path + ".png", dpi=DPI)
+    fig.savefig(path + ".pdf", dpi=DPI)
+
+# %% [markdown]
+# ## scatter-plot num. significants
 
 # %%
 plot_df = num_significant_associations.set_index(grouping)["num_significant"].unstack("feature_set").reset_index()
@@ -361,6 +379,8 @@ plot_df
 
 # %%
 import itertools
+
+keys = adj_regression_results_pd_df["feature_set"].unique().tolist()
 
 for feature_x, feature_y in list(itertools.combinations(keys, 2)):
     print(f"Plotting '{feature_x}' vs '{feature_y}'...")
@@ -390,6 +410,7 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
     print(f"Saving to '{path}'")
     pn.ggsave(plot, path + ".png", dpi=DPI)
     pn.ggsave(plot, path + ".pdf", dpi=DPI)
+    
 
 # %% [markdown]
 # ## boxplot
