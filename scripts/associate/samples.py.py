@@ -44,7 +44,9 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'samples',
         default_wildcards={
-            "phenotype_col": "Asthma",
+            # "phenotype_col": "Asthma",
+            # "phenotype_col": "c_reactive_protein",
+            "phenotype_col": "Mean_corpuscular_haemoglobin_concentration",
             # "phenotype_col": "systolic_blood_pressure_f4080_0_0",
             "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex+age+genPC+CLMP",
@@ -77,10 +79,11 @@ phenotype_metadata_df = pl.read_parquet(snakemake.input["phenotype_metadata_pq"]
 phenotype_metadata_df
 
 # %%
+# get all necessary dataframes for the fields 22006 and 22011
 data_dfs = []
-for group_df in phenotype_metadata_df.filter(pl.col("field.showcase").is_in(["22006", "22011"])).groupby("data_path"):
+for path, group_df in phenotype_metadata_df.filter(pl.col("field.showcase").is_in(["22006", "22011"])).groupby("data_path"):
     data_df = (
-        pl.scan_parquet(group_df["data_path"].unique()[0])
+        pl.scan_parquet(path)
         .select([
             "eid",
             *group_df["col.name"].to_list()
@@ -101,7 +104,9 @@ data_df = data_df.rename({"eid": "individual"})
 
 # %%
 # make sure that sample_id is a string
-data_df = data_df.with_column(pl.col("individual").cast(pl.Utf8).alias("individual"))
+data_df = data_df.with_columns([
+    pl.col("individual").cast(pl.Utf8).alias("individual")
+])
 
 # %%
 # join on samples
@@ -117,11 +122,13 @@ genetic_relatedness_pairing_cols
 # %%
 data_df = (
     data_df
-    .with_column(
-        pl.concat_list(genetic_relatedness_pairing_cols)
-        .arr.eval(pl.element().drop_nulls())
-        .alias("genetic_relatedness_pairing")
-    )
+    .with_columns([
+        (
+            pl.concat_list(genetic_relatedness_pairing_cols)
+            .arr.eval(pl.element().drop_nulls())
+            .alias("genetic_relatedness_pairing")
+        ),
+    ])
     .drop(genetic_relatedness_pairing_cols)
 )
 
