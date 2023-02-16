@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'platelet_distribution_width_f30110_(\d*)_0':
+
+quantile_norm: True

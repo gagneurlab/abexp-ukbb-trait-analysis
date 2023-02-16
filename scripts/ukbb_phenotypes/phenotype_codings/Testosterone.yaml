@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'testosterone_f30850_(\d*)_0':
+
+quantile_norm: True

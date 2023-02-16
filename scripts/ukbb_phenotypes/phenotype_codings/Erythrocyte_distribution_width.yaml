@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'red_blood_cell_erythrocyte_distribution_width_f30070_(\d*)_0':
+
+quantile_norm: True

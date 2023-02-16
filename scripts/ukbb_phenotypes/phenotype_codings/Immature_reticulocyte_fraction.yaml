@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'immature_reticulocyte_fraction_f30280_(\d*)_0':
+
+quantile_norm: True

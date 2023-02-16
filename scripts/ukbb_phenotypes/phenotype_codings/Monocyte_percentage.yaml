@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'monocyte_percentage_f30190_(\d*)_0':
+
+quantile_norm: True

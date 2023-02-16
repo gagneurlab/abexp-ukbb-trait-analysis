@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'gamma_glutamyltransferase_f30730_(\d*)_0':
+
+quantile_norm: True

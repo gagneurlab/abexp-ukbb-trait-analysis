@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'apolipoprotein_a_f30630_(\d*)_0':
+
+quantile_norm: True

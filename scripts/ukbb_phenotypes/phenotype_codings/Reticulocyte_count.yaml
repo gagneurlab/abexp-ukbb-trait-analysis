@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'reticulocyte_count_f30250_(\d*)_0':
+
+quantile_norm: True

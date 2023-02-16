@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'haemoglobin_concentration_f30020_(\d*)_0':
+
+quantile_norm: True

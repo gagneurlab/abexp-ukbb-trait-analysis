@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'mean_platelet_thrombocyte_volume_f30100_(\d*)_0':
+
+quantile_norm: True

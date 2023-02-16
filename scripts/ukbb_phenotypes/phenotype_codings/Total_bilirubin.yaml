@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'total_bilirubin_f30840_(\d*)_0':
+
+quantile_norm: True

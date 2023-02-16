@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'eosinophill_percentage_f30210_(\d*)_0':
+
+quantile_norm: True

@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'high_light_scatter_reticulocyte_count_f30300_(\d*)_0':
+
+quantile_norm: True

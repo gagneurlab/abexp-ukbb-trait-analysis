@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'rheumatoid_factor_f30820_(\d*)_0':
+
+quantile_norm: True

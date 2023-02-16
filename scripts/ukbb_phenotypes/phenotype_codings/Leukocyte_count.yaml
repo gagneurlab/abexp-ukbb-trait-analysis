@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'white_blood_cell_leukocyte_count_f30000_(\d*)_0':
+
+quantile_norm: True

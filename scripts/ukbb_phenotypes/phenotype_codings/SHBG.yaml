@@ -1,0 +1,8 @@
+
+type: mean
+
+fields:
+  # field.showcase: [list of matching terms]
+  'shbg_f30830_(\d*)_0':
+
+quantile_norm: True
