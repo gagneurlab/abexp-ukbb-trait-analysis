@@ -28,7 +28,7 @@ Creatinine,PGS001945,"/s/project/uk_biobank/processed/risk_scores/PGS001945/PGS0
 Cystatin_C,PGS001947,"/s/project/uk_biobank/processed/risk_scores/PGS001947/PGS001947.sscore","/s/project/uk_biobank/processed/clumping/30720/GWAS_variants_clumped_mac.parquet","30720"
 Gamma_glutamyltransferase,PGS001964,"/s/project/uk_biobank/processed/risk_scores/PGS001964/PGS001964.sscore","/s/project/uk_biobank/processed/clumping/30730/GWAS_variants_clumped_mac.parquet","30730"
 Glucose,PGS001952,"/s/project/uk_biobank/processed/risk_scores/PGS001952/PGS001952.sscore","/s/project/uk_biobank/processed/clumping/30740/GWAS_variants_clumped_mac.parquet","30740"
-IGF-1,PGS001960,"/s/project/uk_biobank/processed/risk_scores/PGS001960/PGS001960.sscore","/s/project/uk_biobank/processed/clumping/30770/GWAS_variants_clumped_mac.parquet","30770"
+IGF1,PGS001960,"/s/project/uk_biobank/processed/risk_scores/PGS001960/PGS001960.sscore","/s/project/uk_biobank/processed/clumping/30770/GWAS_variants_clumped_mac.parquet","30770"
 Oestradiol,PGS001182,"/s/project/uk_biobank/processed/risk_scores/PGS001182/PGS001182.sscore","/s/project/uk_biobank/processed/clumping/30800/GWAS_variants_clumped_mac.parquet","30800"
 Phosphate,PGS001998,"/s/project/uk_biobank/processed/risk_scores/PGS001998/PGS001998.sscore","/s/project/uk_biobank/processed/clumping/30810/GWAS_variants_clumped_mac.parquet","30810"
 Rheumatoid_factor,PGS001138,"/s/project/uk_biobank/processed/risk_scores/PGS001138/PGS001138.sscore","/s/project/uk_biobank/processed/clumping/30820/GWAS_variants_clumped_mac.parquet","30820"
