@@ -82,9 +82,9 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'compare_associations',
         default_wildcards={
-            # "comparison": "all",
+            "comparison": "all",
             # "comparison": "paper_figure",
-            "comparison": "paper_figure_all_traits",
+            # "comparison": "paper_figure_all_traits",
         }
     )
 
