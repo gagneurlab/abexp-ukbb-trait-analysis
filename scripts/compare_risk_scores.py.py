@@ -80,7 +80,8 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'compare_risk_scores',
         default_wildcards={
-            "comparison": "all", 
+            # "comparison": "all", 
+            "comparison": "paper_figure", 
         }
     )
 
@@ -122,6 +123,39 @@ predictions_df = (
 )
 predictions_df.printSchema()
 
+# %% [markdown]
+# ## compute r2 scores
+
+# %%
+from sklearn.metrics import r2_score
+
+# %%
+r2_score_df = []
+for path in snakemake.input["predictions_pq"]:
+    df = pd.read_parquet(path)
+    r2_score_df.append(
+        pd.DataFrame({
+            "rsquared_full": [r2_score(y_true=df["measurement"], y_pred=df["full_model_pred"])],
+            "rsquared_restricted": [r2_score(y_true=df["measurement"], y_pred=df["restricted_model_pred"])],
+            "rsquared_basic": [r2_score(y_true=df["measurement"], y_pred=df["basic_model_pred"])],
+            **{c: [df[c].iloc[0]] for c in [
+                "phenotype_col",
+                "feature_set",
+                "covariates",
+            ]},
+        })
+    )
+r2_score_df = pd.concat(r2_score_df).reset_index(drop=True)
+r2_score_df
+
+# %%
+path = snakemake.params["output_basedir"] + f"/rsquared"
+r2_score_df.to_csv(path + ".csv", index=False)
+r2_score_df.to_parquet(path + ".parquet", index=False)
+
+
+# %% [markdown]
+# ## compute ranks
 
 # %%
 def assign_ranks(df: pd.DataFrame):
@@ -220,8 +254,176 @@ quantiles_df.printSchema()
 quantiles_pd_df = quantiles_df.toPandas()
 quantiles_pd_df
 
+# %%
+path = snakemake.params["output_basedir"] + f"/quantile_counts"
+quantiles_pd_df.to_csv(path + ".csv", index=False)
+quantiles_pd_df.to_parquet(path + ".parquet", index=False)
+
 # %% [markdown]
 # ## Plot
+
+# %% [markdown]
+# ## scatter-plot r2
+
+# %%
+r2_score_df
+
+# %%
+plot_df = r2_score_df
+grouping = ['phenotype_col', 'feature_set', 'covariates']
+keys = plot_df["feature_set"].unique().tolist()
+
+unstacked_plot_full_df = plot_df.set_index(grouping)["rsquared_full"].unstack("feature_set")
+unstacked_plot_full_df
+unstacked_plot_restricted_df = plot_df.set_index(grouping)["rsquared_restricted"].unstack("feature_set")
+unstacked_plot_restricted_df
+
+# %%
+subset_plot_df = unstacked_plot_full_df.reset_index()
+assert np.all(unstacked_plot_restricted_df[feature_x].values == unstacked_plot_restricted_df[feature_y].values)
+subset_plot_df = subset_plot_df.assign(**{
+    f"difference_to_{feature_x}": subset_plot_df[feature_y] - subset_plot_df[feature_x],
+    "phenotype_col": subset_plot_df["phenotype_col"].str.replace("_", " "),
+    "baseline": unstacked_plot_restricted_df[feature_x].values,
+})
+subset_plot_df
+
+# %% [markdown]
+# ### scatter plot
+
+# %%
+import itertools
+
+# list(itertools.combinations(keys, 2))
+for feature_x, feature_y in list(itertools.product(keys, keys)):
+    if feature_x == feature_y:
+        continue
+    
+    subset_plot_df = unstacked_plot_full_df.reset_index()
+    assert np.all(unstacked_plot_restricted_df[feature_x].values == unstacked_plot_restricted_df[feature_y].values)
+    subset_plot_df = subset_plot_df.assign(**{
+        f"difference_to_{feature_x}": subset_plot_df[feature_y] - subset_plot_df[feature_x],
+        "phenotype_col": subset_plot_df["phenotype_col"].str.replace("_", " "),
+        "baseline": unstacked_plot_restricted_df[feature_x].values,
+    })
+    subset_plot_df
+
+    plot = (
+        pn.ggplot(subset_plot_df.reset_index(), pn.aes(
+            x=f"{feature_x}",
+            y=f"{feature_y}",
+            fill=f"phenotype_col",
+        ))
+        + pn.geom_point(
+            # pn.aes(width=.95, height=.95),
+            size=3,
+        )
+        + pn.geom_abline(slope=1, linetype="dashed")
+        # + pn.scale_fill_gradient2(
+        #     # low = muted("red"),
+        #     # mid = "white",
+        #     # high = muted("blue"),
+        #     midpoint = 0,
+        #     labels=mizani.formatters.percent_format()
+        # )
+        + pn.labs(
+            x=f"""{feature_x.replace("_", " ")} (r²)""",
+            y=f"""{feature_y.replace("_", " ")} (r²)""",
+            title=f"Comparison of PRS models using different feature sets",
+        )
+        + pn.theme(
+            legend_text=pn.element_text(linespacing=1.4),
+            # figure_size=(8, 8),
+            # axis_text_x=pn.element_text(
+            #     rotation=45,
+            #     hjust=1
+            # ),
+            # strip_text_y=pn.element_text(
+            #     rotation=0,
+            # ),
+            title=pn.element_text(linespacing=1.4, vjust=-10),
+        )
+        + pn.coord_equal()
+        # + pn.coord_flip()
+    )
+    display(plot)
+    
+    path = snakemake.params["output_basedir"] + f"/r2_scatter.{feature_x}__vs__{feature_y}"
+    pn.ggsave(plot, path + ".png", dpi=DPI)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI)
+
+
+# %% [markdown]
+# ### bar plot
+
+# %%
+import itertools
+
+# list(itertools.combinations(keys, 2))
+for feature_x, feature_y in list(itertools.product(keys, keys)):
+    if feature_x == feature_y:
+        continue
+    
+    subset_plot_df = unstacked_plot_full_df.reset_index()
+    assert np.all(unstacked_plot_restricted_df[feature_x].values == unstacked_plot_restricted_df[feature_y].values)
+    subset_plot_df = subset_plot_df.assign(**{
+        f"difference_to_{feature_x}": subset_plot_df[feature_y] - subset_plot_df[feature_x],
+        "phenotype_col": subset_plot_df["phenotype_col"].str.replace("_", " "),
+        "baseline": unstacked_plot_restricted_df[feature_x].values,
+    })
+    subset_plot_df = (
+        subset_plot_df
+        .reset_index()
+        .melt(id_vars=["phenotype_col", "covariates"], value_vars=["baseline", feature_x, feature_y], value_name="rsquared")
+    )
+    subset_plot_df = (
+        subset_plot_df
+        .assign(**{
+            "feature_set": subset_plot_df["feature_set"].str.replace("_", " "),
+        })
+    )
+    subset_plot_df
+
+    plot = (
+        pn.ggplot(subset_plot_df, pn.aes(
+            x=f"phenotype_col",
+            y=f"rsquared",
+            fill=f"feature_set",
+        ))
+        + pn.geom_bar(stat="identity", position="dodge")
+        # + pn.scale_fill_gradient2(
+        #     # low = muted("red"),
+        #     # mid = "white",
+        #     # high = muted("blue"),
+        #     midpoint = 0,
+        #     labels=mizani.formatters.percent_format()
+        # )
+        + pn.labs(
+            x=f"""phenotype""",
+            y=f"""r²""",
+            title=f"Comparison of PRS models using different feature sets",
+        )
+        + pn.theme(
+            legend_text=pn.element_text(linespacing=1.4),
+            # figure_size=(8, 8),
+            # axis_text_x=pn.element_text(
+            #     rotation=45,
+            #     hjust=1
+            # ),
+            # strip_text_y=pn.element_text(
+            #     rotation=0,
+            # ),
+            title=pn.element_text(linespacing=1.4, vjust=-10),
+        )
+        # + pn.coord_equal()
+        + pn.coord_flip()
+    )
+    display(plot)
+    
+    path = snakemake.params["output_basedir"] + f"/r2_bar_plot.{feature_x}__vs__{feature_y}"
+    pn.ggsave(plot, path + ".png", dpi=DPI)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI)
+
 
 # %% [markdown]
 # ## barplot num. significants
@@ -340,6 +542,7 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
         f"true_positive_rate_{feature_x}": (subset_plot_df[feature_x] / subset_plot_df["total"]),
         f"true_positive_rate_{feature_y}": (subset_plot_df[feature_y] / subset_plot_df["total"]),
         "quantile": subset_plot_df["measurement_quantile"].astype("str") + " (" + subset_plot_df["bound"] + ")",
+        "phenotype_col": subset_plot_df["phenotype_col"].str.replace("_", " "),
     })
 
     plot = (
@@ -362,8 +565,8 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
         #     labels=mizani.formatters.percent_format()
         # )
         + pn.labs(
-            x=f"true positive rate ({feature_x})",
-            y=f"true positive rate ({feature_y})",
+            x=f"""true positive rate ({feature_x.replace("_", " ")})""",
+            y=f"""true positive rate ({feature_y.replace("_", " ")})""",
             # title=f"difference of individuals at risk for '{feature_y}'\n(baseline: Age+Sex+PRS+{feature_x})"
         )
         + pn.theme(
@@ -387,5 +590,8 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
     pn.ggsave(plot, path + ".png", dpi=DPI)
     pn.ggsave(plot, path + ".pdf", dpi=DPI)
 
+
+# %%
+snakemake.output
 
 # %%
