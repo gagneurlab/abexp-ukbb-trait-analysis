@@ -98,7 +98,7 @@ snakefile_path = os.getcwd() + "/../../Snakefile"
 snakefile_path
 
 # %%
-#del snakemake
+# del snakemake
 
 # %%
 try:
@@ -110,18 +110,19 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__regression',
         default_wildcards={
+            "phenotype_col": "CAD_SOFT",
             # "phenotype_col": "severe_LDL",
             # "phenotype_col": "Asthma",
             # "phenotype_col": "Triglycerides",
             # "phenotype_col": "IGF1",
-            "phenotype_col": "Direct_bilirubin",
+            # "phenotype_col": "Direct_bilirubin",
             # "phenotype_col": "triglycerides_f30870_0_0",
             # "phenotype_col": "standing_height_f50_0_0",
             # "phenotype_col": "body_mass_index_bmi_f21001_0_0",
             # "phenotype_col": "systolic_blood_pressure_automated_reading_f4080_0_0",
             # "phenotype_col": "hdl_cholesterol_f30760_0_0",
-            "feature_set": "LOFTEE_pLoF",
-            # "feature_set": "max_AbExp",
+            # "feature_set": "LOFTEE_pLoF",
+            "feature_set": "max_AbExp",
             # "feature_set": "AbExp_all_tissues",
             # "feature_set": "LOFTEE_pLoF",
             "covariates": "randomized_sex_age_genPC_CLMP_PRS",
@@ -1248,7 +1249,7 @@ def fit(
 
             # calculate statistics
             if restricted_model_converged and full_model_converged:
-                lr_stat, lr_pval, lr_df_diff = full_model.compare_lr_test(restricted_model)
+                lr_stat, lr_pval, lr_df_diff = lr_test(restricted_model, full_model)
             else:
                 lr_stat = np.nan
                 lr_pval = np.nan
