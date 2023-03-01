@@ -28,7 +28,7 @@ output_basedir: "/s/project/rep/processed/trait_associations_v4/ukbb_wes_200k"
 
 trait_associations: "/s/project/rep/processed/trait_associations_v4/ukbb_wes_200k/associate/{phenotype_col}"
 trait_association_comparison: "/s/project/rep/processed/trait_associations_v4/ukbb_wes_200k/compare_associations"
-risk_score_comparison: "/s/project/rep/processed/trait_associations_v3/ukbb_wes_200k/compare_risk_scores"
+risk_score_comparison: "/s/project/rep/processed/trait_associations_v4/ukbb_wes_200k/compare_risk_scores"
 feature_sets_dir: "/s/project/rep/processed/trait_associations_v4/ukbb_wes_200k/feature_sets"
 samples: "/s/project/rep/processed/trait_associations_v4/ukbb_wes_200k/samples.txt"
 PRS_score_mapping: "/s/project/rep/processed/trait_associations_v4/ukbb_wes_200k/PRS_score_mapping.csv"

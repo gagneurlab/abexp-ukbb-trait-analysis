@@ -3,6 +3,6 @@ type: mean
 
 fields:
   # field.showcase: [list of matching terms]
-  'creactive_protein_f30710_(\d*)_0':
+  'monocyte_count_f30130_(\d*)_0':
 
 quantile_norm: True

@@ -13,3 +13,4 @@ dependencies:
   - r-irkernel
   - r-ggplot2
   - r-hms
+  - r-xml
