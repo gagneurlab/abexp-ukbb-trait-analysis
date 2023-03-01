@@ -5,11 +5,6 @@ SCRIPT=os.path.basename(SNAKEFILE)[:-4]
 
 include: f"{SNAKEFILE_DIR}/genes.py.smk"
 include: f"{SNAKEFILE_DIR}/compare_associations.py.smk"
-<<<<<<< HEAD
-#include: f"{SNAKEFILE_DIR}/compare_risk_scores.py.smk"
-=======
-include: f"{SNAKEFILE_DIR}/compare_risk_scores.py.smk"
->>>>>>> origin/AbExp
 
 # subdirectories
 smkpaths = [

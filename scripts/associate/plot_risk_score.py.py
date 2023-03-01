@@ -66,14 +66,14 @@ except NameError:
         default_wildcards={
             #"phenotype_col": "standing_height",
             #"phenotype_col": "glycated_haemoglobin_hba1c",
-            #"phenotype_col": "Lipoprotein_A",
+            "phenotype_col": "Lipoprotein_A",
             #"phenotype_col": "BodyMassIndex",
             #"phenotype_col": "Triglycerides",
-            "phenotype_col": "LDL_direct",
+            #"phenotype_col": "LDL_direct",
             #"phenotype_col": "systolic_blood_pressure",
             #"phenotype_col": "HDL_cholesterol",
-            "feature_set": "LOFTEE_pLoF",
-            #"feature_set": "AbExp_all_tissues",
+            #"feature_set": "LOFTEE_pLoF",
+            "feature_set": "AbExp_all_tissues",
             "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex_age_genPC_CLMP",
             # "covariates": "sex_age_genPC",
@@ -156,8 +156,8 @@ pred_df = (
         "basic_model_pred_rank": pred_df["basic_model_pred"].rank(ascending = False),
         "at_risk_low": pred_df["phenotype_quantile"] == 0,
         "at_risk_high": pred_df["phenotype_quantile"] == nr_of_quantiles-1,
-        "at_risk": np.abs(pred_df["measurement"] - pehnotype_mean) > 2 * phenotype_std,
-        "full_model_new_risk": np.abs(pred_df["full_model_pred"] - restricted_model_mean) > 4 * restricted_model_std
+        "at_risk": np.abs(pred_df["measurement"] - pehnotype_mean) > 1 * phenotype_std,
+        "full_model_new_risk": np.abs(pred_df["full_model_pred"] - pred_df["restricted_model_pred"]) > (1 * restricted_model_std)
     })
 )
 pred_df
@@ -185,7 +185,7 @@ plot_df = pred_df[["phenotype_col", "measurement", "basic_model_pred", "restrict
 plot_df = plot_df.melt(id_vars=["phenotype_col", "measurement", "full_model_new_risk", "at_risk"])
 
 plot = (
-    pn.ggplot(plot_df, pn.aes(y="measurement", x="value", color='at_risk'))
+    pn.ggplot(plot_df, pn.aes(y="measurement", x="value", color='full_model_new_risk'))
     + pn.ggtitle(f"Predictions of LGBM models for {phenotype_col} ({phenocode})")
     + pn.geom_bin_2d(bins=100)
     + pn.geom_smooth(method="lm", color="red")
@@ -194,6 +194,7 @@ plot = (
     + pn.theme(figure_size=(12, 4))
     + pn.theme(title = pn.element_text(va = "top", linespacing = 4))
     + pn.coord_equal()
+    + pn.scale_color_manual(values = {True: "orange", False: "None"})
     + pn.labs(
         x="prediction",
     )
@@ -206,21 +207,15 @@ display(plot)
 pred_df.groupby(["full_model_new_risk", "at_risk"]).size()
 
 # %%
-pred_df.groupby(["full_model_new_risk", "at_risk"]).size()
-
-# %%
-pred_df
-
-# %%
-plot_df = pred_df[["full_model_pred", "restricted_model_pred"]].rename(columns = {"full_model_pred": f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}", "restricted_model_pred": "Age+Sex+PC+PRS"})
+plot_df = pred_df[["full_model_pred", "restricted_model_pred", "full_model_new_risk"]].rename(columns = {"full_model_pred": f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}", "restricted_model_pred": "Age+Sex+PC+PRS"})
 
 plot = (
-    pn.ggplot(plot_df, pn.aes(y=f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}", x="Age+Sex+PC+PRS"))
+    pn.ggplot(plot_df, pn.aes(y=f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}", x="Age+Sex+PC+PRS", color="full_model_new_risk"))
     + pn.ggtitle(f"Predictions for {phenotype_col} of models on PRS vs. PRS + {snakemake.wildcards['feature_set']}")
     + pn.geom_bin_2d(bins=100)
     + pn.geom_smooth(method="lm", color="red")
     + pn.scale_fill_continuous(trans = "log10")
-    #+ pn.coord_equal()
+    + pn.scale_color_manual(values = {True: "orange", False: "None"})
 )
 display(plot)
 
@@ -412,3 +407,122 @@ plot = (
 
 #pn.ggsave(plot = plot, filename = snakemake.output["predictions_plot_png"], dpi=DPI)
 display(plot)
+
+# %%
+res = []
+nr_of_quantiles = 10
+distance_std = 0.5
+for phenotype in ["LDL_direct", "standing_height", "glycated_haemoglobin_hba1c","Lipoprotein_A","BodyMassIndex","Triglycerides","HDL_cholesterol"]:
+    pred_df = pd.read_parquet(f"/s/project/rep/processed/trait_associations_v3/ukbb_wes_200k/associate/{phenotype}/cov=sex_age_genPC_CLMP_PRS/fset=AbExp_all_tissues/polygenic_risk_score/predictions.parquet")
+    pred_Loftee_df = pd.read_parquet(f"/s/project/rep/processed/trait_associations_v3/ukbb_wes_200k/associate/{phenotype}/cov=sex_age_genPC_CLMP_PRS/fset=LOFTEE_pLoF/polygenic_risk_score/predictions.parquet")
+    pred_df["loftee_model_pred"] = pred_Loftee_df["full_model_pred"]
+    pred_df["abexp_model_pred"] = pred_df["full_model_pred"]
+    pred_df["phenotype_quantile"] = pd.qcut(pred_df["measurement"], nr_of_quantiles, labels=False, duplicates="drop")
+    pred_df["at_risk_low"] = (pred_df["phenotype_quantile"] == 0)
+    pred_df["at_risk_high"] = (pred_df["phenotype_quantile"] == nr_of_quantiles-1)
+    distance_to_common_prs = pred_df["restricted_model_pred"].std() * distance_std
+    print(phenotype, distance_to_common_prs)
+    
+    for extreme in ["low", "high"]:
+        for method in ["abexp", "loftee"]:
+            pred_df[f"new_{method}_at_risk_{extreme}"] = ((pred_df["restricted_model_pred"] - pred_df[f"{method}_model_pred"]) > distance_to_common_prs) if extreme == 'low' else ((pred_df["restricted_model_pred"] - pred_df[f"{method}_model_pred"]) < (-distance_to_common_prs))
+            for model_type in ["baseline", "full"]:
+                res.append({
+                    "phenotype": phenotype,
+                    "extreme": extreme,
+                    "method": method,
+                    "model_type": model_type,
+                    "individuals": pred_df[f"new_{method}_at_risk_{extreme}"].sum(),
+                    "mse": sklearn.metrics.mean_squared_error(pred_df.query(f"new_{method}_at_risk_{extreme}")["measurement"], pred_df.query(f"new_{method}_at_risk_{extreme}")[f"{method}_model_pred" if model_type=="full" else "restricted_model_pred"]) if pred_df[f"new_{method}_at_risk_{extreme}"].sum()>0 else 0,
+                    "rmse": sklearn.metrics.mean_squared_error(pred_df.query(f"new_{method}_at_risk_{extreme}")["measurement"], pred_df.query(f"new_{method}_at_risk_{extreme}")[f"{method}_model_pred" if model_type=="full" else "restricted_model_pred"], squared=False) if pred_df[f"new_{method}_at_risk_{extreme}"].sum()>0 else 0,
+                    "r2": sklearn.metrics.r2_score(pred_df.query(f"new_{method}_at_risk_{extreme}")["measurement"], pred_df.query(f"new_{method}_at_risk_{extreme}")[f"{method}_model_pred" if model_type=="full" else "restricted_model_pred"]) if pred_df[f"new_{method}_at_risk_{extreme}"].sum()>0 else 0
+
+                })
+res_df = pd.DataFrame.from_dict(res)
+
+# %%
+plot = (
+    pn.ggplot(res_df, pn.aes(y="individuals", x="method"))
+    + pn.ggtitle(f"Number of individuals where prediction differs by more than {distance_std} standard deviation(s) from common PRS")
+    + pn.geom_bar(stat="identity")
+    + pn.facet_grid("extreme ~ phenotype")
+    #+ pn.facet_wrap(["phenotype", "extreme", "metric"])
+    + pn.theme(figure_size=(16, 6))
+    #+ pn.theme(axis_text_y = pn.element_text(rotation=90))
+)
+
+#pn.ggsave(plot = plot, filename = snakemake.output["predictions_plot_png"], dpi=DPI)
+display(plot)
+
+# %%
+plot = (
+    pn.ggplot(res_df, pn.aes(y="rmse", x="method", fill="model_type"))
+    + pn.ggtitle(f"RMSE of predictions for individuals where prediction differs by more than {distance_std} standard deviation(s) from common PRS")
+    + pn.geom_bar(stat="identity", position="dodge")
+    + pn.facet_grid("extreme ~ phenotype")
+    #+ pn.facet_wrap(["phenotype", "extreme", "metric"])
+    + pn.theme(figure_size=(16, 6))
+    #+ pn.theme(axis_text_y = pn.element_text(rotation=90))
+    #+ pn.coord_flip()
+)
+
+#pn.ggsave(plot = plot, filename = snakemake.output["predictions_plot_png"], dpi=DPI)
+display(plot)
+
+# %%
+res = []
+nr_of_quantiles = 100
+distance_std = 1
+for phenotype in ["LDL_direct", "standing_height", "glycated_haemoglobin_hba1c","Lipoprotein_A","BodyMassIndex","Triglycerides","HDL_cholesterol"]:
+    pred_df = pd.read_parquet(f"/s/project/rep/processed/trait_associations_v3/ukbb_wes_200k/associate/{phenotype}/cov=sex_age_genPC_CLMP_PRS/fset=AbExp_all_tissues/polygenic_risk_score/predictions.parquet")
+    pred_Loftee_df = pd.read_parquet(f"/s/project/rep/processed/trait_associations_v3/ukbb_wes_200k/associate/{phenotype}/cov=sex_age_genPC_CLMP_PRS/fset=LOFTEE_pLoF/polygenic_risk_score/predictions.parquet")
+    pred_df["LOFTEE_model_pred"] = pred_Loftee_df["full_model_pred"]
+    pred_df["AbExp_model_pred"] = pred_df["full_model_pred"]
+    pred_df["phenotype_quantile"] = pd.qcut(pred_df["measurement"], nr_of_quantiles, labels=False, duplicates="drop")
+    pred_df["at_risk_low"] = (pred_df["phenotype_quantile"] == 0)
+    pred_df["at_risk_high"] = (pred_df["phenotype_quantile"] == nr_of_quantiles-1)
+    pred_df["at_risk"] = pred_df["at_risk_high"] | pred_df["at_risk_low"]
+    distance_to_common_prs = pred_df["restricted_model_pred"].std() * distance_std
+    print(phenotype, distance_to_common_prs)
+    
+    for method in ["AbExp", "LOFTEE"]:
+        pred_df[f"{method}_deviation_from_PRS"] = np.abs((pred_df["restricted_model_pred"] - pred_df[f"{method}_model_pred"]))
+        pred_df[f"new_{method}_at_risk"] = (pred_df[f"{method}_deviation_from_PRS"]) > distance_to_common_prs
+        #pred_df[f"new_{method}_at_risk"] = pd.qcut(pred_df[f"{method}_deviation_from_PRS"], nr_of_quantiles, labels=False, duplicates="drop").isin([0,nr_of_quantiles-1])
+        for model_type in ["common_PRS", "full"]:
+            for at_risk in [True, False]:
+                res.append({
+                    "phenotype": phenotype,
+                    "method": method,
+                    #f"extreme_phenotype_{1/nr_of_quantiles*100}%": at_risk,
+                    "extreme_phenotype": at_risk,
+                    "model_type": model_type,
+                    "individuals": pred_df[f"new_{method}_at_risk"].sum(),
+                    "mse": sklearn.metrics.mean_squared_error(pred_df.query(f"new_{method}_at_risk")["measurement"], pred_df.query(f"new_{method}_at_risk")[f"{method}_model_pred" if model_type=="full" else "restricted_model_pred"]) if pred_df[f"new_{method}_at_risk"].sum()>0 else 0,
+                    "RMSE": sklearn.metrics.mean_squared_error(pred_df.query(f"new_{method}_at_risk")["measurement"], pred_df.query(f"new_{method}_at_risk")[f"{method}_model_pred" if model_type=="full" else "restricted_model_pred"], squared=False) if pred_df[f"new_{method}_at_risk"].sum()>0 else 0,
+                    "r2": sklearn.metrics.r2_score(pred_df.query(f"new_{method}_at_risk")["measurement"], pred_df.query(f"new_{method}_at_risk")[f"{method}_model_pred" if model_type=="full" else "restricted_model_pred"]) if pred_df[f"new_{method}_at_risk"].sum()>0 else 0,
+                    "individuals_count": len(pred_df.query(f"new_{method}_at_risk==True and at_risk=={at_risk}"))
+                })
+res_df = pd.DataFrame.from_dict(res)
+
+# %%
+plot1 = (
+    pn.ggplot(res_df.query("model_type=='full'"), pn.aes(y="individuals", x="method"))
+    + pn.ggtitle(f"Number of individuals where prediction differs by more than {distance_std} standard deviation(s) from common PRS and measuremt is extreme (1%)")
+    + pn.geom_bar(stat="identity")
+    + pn.facet_wrap("phenotype", nrow=1)
+    + pn.theme(figure_size=(16, 4))
+)
+display(plot1)
+
+# %%
+plot2 = (
+    pn.ggplot(res_df, pn.aes(y="RMSE", x="method", fill="model_type"))
+    + pn.ggtitle(f"RMSE of predictions where prediction differs by more than {distance_std} standard deviation(s) from common PRS")
+    + pn.geom_bar(stat="identity", position="dodge")
+    + pn.facet_wrap("phenotype", nrow=1)
+    + pn.theme(figure_size=(12, 4))
+)
+display(plot2)
+
+# %%
