@@ -133,7 +133,7 @@ else:
 
 # %%
 samples_df["fold"] = ""
-association_index, train_index = next(train_test_split.split(samples_df["individual"], samples_df[phenotype_col]))
+association_index, train_index = next(association_split.split(samples_df["individual"], samples_df[phenotype_col]))
 samples_df.loc[association_index, "fold"] = "association_testing"
 
 for idx, (train_fold_index, test_fold_index) in enumerate(valid_split.split(train_index, samples_df[phenotype_col].iloc[train_index])):
