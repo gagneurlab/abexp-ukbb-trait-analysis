@@ -18,6 +18,8 @@ rule train_test_split:
         covariates_pq=f'''{COVARIATES_BASEPATH}/covariates.parquet''',
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
+        assocation_split=config["association_split"],
+        phenotype_prediction_folds=config["phenotype_prediction_folds"],
     wildcard_constraints:
         covariates="[^/]+",
 #     log:
