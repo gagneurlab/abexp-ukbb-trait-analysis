@@ -80,8 +80,8 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'compare_risk_scores',
         default_wildcards={
-            "comparison": "all", 
-            # "comparison": "paper_figure", 
+            # "comparison": "all", 
+            "comparison": "paper_figure",
         }
     )
 
@@ -135,9 +135,9 @@ for path in snakemake.input["predictions_pq"]:
     df = pd.read_parquet(path)
     r2_score_df.append(
         pd.DataFrame({
-            "rsquared_full": [r2_score(y_true=df["measurement"], y_pred=df["full_model_pred"])],
-            "rsquared_restricted": [r2_score(y_true=df["measurement"], y_pred=df["restricted_model_pred"])],
-            "rsquared_basic": [r2_score(y_true=df["measurement"], y_pred=df["basic_model_pred"])],
+            "full_model_r2": [r2_score(y_true=df["measurement"], y_pred=df["full_model_pred"])],
+            "restricted_model_r2": [r2_score(y_true=df["measurement"], y_pred=df["restricted_model_pred"])],
+            "basic_model_r2": [r2_score(y_true=df["measurement"], y_pred=df["basic_model_pred"])],
             **{c: [df[c].iloc[0]] for c in [
                 "phenotype_col",
                 "feature_set",
@@ -152,6 +152,15 @@ r2_score_df
 path = snakemake.params["output_basedir"] + f"/rsquared"
 r2_score_df.to_csv(path + ".csv", index=False)
 r2_score_df.to_parquet(path + ".parquet", index=False)
+
+# %% {"tags": []}
+fold_r2_score_df = pd.read_parquet(snakemake.input["r2_scores_pq"])
+fold_r2_score_df
+
+# %% {"tags": []}
+path = snakemake.params["output_basedir"] + f"/rsquared_fold"
+fold_r2_score_df.to_csv(path + ".csv", index=False)
+fold_r2_score_df.to_parquet(path + ".parquet", index=False)
 
 
 # %% [markdown]
@@ -259,6 +268,53 @@ path = snakemake.params["output_basedir"] + f"/quantile_counts"
 quantiles_pd_df.to_csv(path + ".csv", index=False)
 quantiles_pd_df.to_parquet(path + ".parquet", index=False)
 
+# %%
+fold_quantiles_df = (
+    transformed_predictions_df.crossJoin(target_quantiles_sdf)
+    .groupby([*target_quantiles_sdf.columns, "phenotype_col", "feature_set", "covariates", "fold"])
+    .agg(
+        f.struct([
+            f.sum((f.col("measurement_rank") > (1 - f.col("measurement_quantile"))).cast(t.LongType())).alias("total"),
+            f.sum((
+                (f.col("full_model_pred_rank") > (1 - f.col("prediction_quantile"))) & (f.col("measurement_rank") > (1 - f.col("measurement_quantile")))
+            ).cast(t.LongType())).alias("full_model"),
+            f.sum((
+                (f.col("restricted_model_pred_rank") > (1 - f.col("prediction_quantile"))) & (f.col("measurement_rank") > (1 - f.col("measurement_quantile")))
+            ).cast(t.LongType())).alias("restricted_model"),
+            f.sum((
+                (f.col("basic_model_pred_rank") > (1 - f.col("prediction_quantile"))) & (f.col("measurement_rank") > (1 - f.col("measurement_quantile")))
+            ).cast(t.LongType())).alias("basic_model"),
+            f.lit("upper").alias("bound"),
+        ]).alias("upper"),
+        f.struct([
+            f.sum((f.col("measurement_rank") < f.col("measurement_quantile")).cast(t.LongType())).alias("total"),
+            f.sum((
+                (f.col("full_model_pred_rank") < f.col("prediction_quantile")) & (f.col("measurement_rank") < f.col("measurement_quantile"))
+            ).cast(t.LongType())).alias("full_model"),
+            f.sum((
+                (f.col("restricted_model_pred_rank") < f.col("prediction_quantile")) & (f.col("measurement_rank") < f.col("measurement_quantile"))
+            ).cast(t.LongType())).alias("restricted_model"),
+            f.sum((
+                (f.col("basic_model_pred_rank") < f.col("prediction_quantile")) & (f.col("measurement_rank") < f.col("measurement_quantile"))
+            ).cast(t.LongType())).alias("basic_model"),
+            f.lit("lower").alias("bound"),
+        ]).alias("lower")
+    )
+    .withColumn("counts", f.explode(f.array(f.col("upper"), f.col("lower"))))
+    .select("*", "counts.*")
+    .drop("upper", "lower", "counts")
+)
+fold_quantiles_df.printSchema()
+
+# %%
+fold_quantiles_pd_df = fold_quantiles_df.toPandas()
+fold_quantiles_pd_df
+
+# %%
+path = snakemake.params["output_basedir"] + f"/fold_quantile_counts"
+fold_quantiles_pd_df.to_csv(path + ".csv", index=False)
+fold_quantiles_pd_df.to_parquet(path + ".parquet", index=False)
+
 # %% [markdown]
 # ## Plot
 
@@ -266,22 +322,32 @@ quantiles_pd_df.to_parquet(path + ".parquet", index=False)
 # ## scatter-plot r2
 
 # %%
+fold_r2_score_df
+
+# %%
 r2_score_df
 
 # %%
-plot_df = r2_score_df
-grouping = ['phenotype_col', 'feature_set', 'covariates']
+plot_df = fold_r2_score_df
+grouping = ['phenotype_col', 'feature_set', 'covariates', 'fold']
 keys = plot_df["feature_set"].unique().tolist()
 
-unstacked_plot_full_df = plot_df.set_index(grouping)["rsquared_full"].unstack("feature_set")
+unstacked_plot_full_df = plot_df.set_index(grouping)["full_model_r2"].unstack("feature_set")
 unstacked_plot_full_df
-unstacked_plot_restricted_df = plot_df.set_index(grouping)["rsquared_restricted"].unstack("feature_set")
+unstacked_plot_restricted_df = plot_df.set_index(grouping)["restricted_model_r2"].unstack("feature_set")
 unstacked_plot_restricted_df
 
 # %% [markdown]
 # ### bar plot difference
 
-# %%
+# %% {"tags": []}
+# feature_x = "LOFTEE_pLoF"
+# feature_y = "AbExp_all_tissues"
+
+# %% {"tags": []}
+from scipy.stats import wilcoxon
+
+# %% {"jupyter": {"outputs_hidden": true}, "tags": []}
 import itertools
 
 # list(itertools.combinations(keys, 2))
@@ -298,16 +364,41 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
         "baseline": unstacked_plot_restricted_df[feature_x].values,
         # f"difference_to_baseline": subset_plot_df[feature_y] - unstacked_plot_restricted_df[feature_x].values,
     })
-    subset_plot_df
+    subset_plot_df = (
+        subset_plot_df
+        .groupby(["phenotype_col", "covariates"]).apply(lambda df:
+            # NormalDist(mu=df[f"difference_to_{feature_x}"].mean(), sigma=df[f"difference_to_{feature_x}"].std()).overlap(NormalDist(mu=0, sigma=df[f"difference_to_{feature_x}"].std()))
+            1 if np.all(df[feature_x] == df[feature_y]) else wilcoxon(df[feature_x], df[feature_y], alternative="two-sided").pvalue
+        )
+        .to_frame(name="pval")
+        .merge(subset_plot_df, on=["phenotype_col", "covariates"], how="right")
+    )
+    subset_plot_df = subset_plot_df.assign(significant=subset_plot_df["pval"] < 0.1) # two-sided
 
     plot = (
         pn.ggplot(subset_plot_df.reset_index(), pn.aes(
             x=f"reorder(phenotype_col, difference_to_{feature_x})",
             y=f"difference_to_{feature_x}",
+            fill="significant",
         ))
-        + pn.geom_bar(
-            stat="identity",
+        # + pn.geom_boxplot()
+        # + pn.geom_bar(
+        #     stat=pn.stat_summary(fun_y=np.mean),
+        # )
+        + pn.geom_errorbar(
+            stat=pn.stat_summary(
+                fun_ymin=lambda x: np.mean(x) - np.std(x),
+                fun_ymax=lambda x: np.mean(x) + np.std(x),
+            ),
         )
+        + pn.geom_point(
+            stat=pn.stat_summary(fun_y=np.mean),
+            size=3,
+        )
+        + pn.scale_fill_manual({
+            False: "black",
+            True: "red",
+        })
         + pn.labs(
             x=f"""phenotype""",
             y=f"""difference in r² between '{feature_y.replace("_", " ")}' and '{feature_x.replace("_", " ")}'""",
@@ -335,6 +426,8 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
     path = snakemake.params["output_basedir"] + f"/r2_bar_plot_difference.{feature_x}__vs__{feature_y}"
     pn.ggsave(plot, path + ".png", dpi=DPI)
     pn.ggsave(plot, path + ".pdf", dpi=DPI)
+    subset_plot_df.to_parquet(path + ".parquet", index=False)
+    subset_plot_df.to_csv(path + ".csv", index=False)
 
 
 # %% [markdown]
@@ -358,16 +451,42 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
         "baseline": unstacked_plot_restricted_df[feature_x].values,
         # f"difference_to_baseline": subset_plot_df[feature_y] - unstacked_plot_restricted_df[feature_x].values,
     })
+    subset_plot_df = (
+        subset_plot_df
+        .groupby(["phenotype_col", "covariates"]).apply(lambda df:
+            # NormalDist(mu=df[f"difference_to_{feature_x}"].mean(), sigma=df[f"difference_to_{feature_x}"].std()).overlap(NormalDist(mu=0, sigma=df[f"difference_to_{feature_x}"].std()))
+            1 if np.all(df[feature_x] == df[feature_y]) else wilcoxon(df[feature_x], df[feature_y], alternative="two-sided").pvalue
+        )
+        .to_frame(name="pval")
+        .merge(subset_plot_df, on=["phenotype_col", "covariates"], how="right")
+    )
+    subset_plot_df = subset_plot_df.assign(significant=subset_plot_df["pval"] < 0.1) # two-sided
     subset_plot_df
 
     plot = (
         pn.ggplot(subset_plot_df.reset_index(), pn.aes(
             x=f"reorder(phenotype_col, proportional_difference_to_{feature_x})",
             y=f"proportional_difference_to_{feature_x}",
+            fill="significant",
         ))
-        + pn.geom_bar(
-            stat="identity",
+        # + pn.geom_boxplot()
+        # + pn.geom_bar(
+        #     stat=pn.stat_summary(fun_y=np.mean),
+        # )
+        + pn.geom_errorbar(
+            stat=pn.stat_summary(
+                fun_ymin=lambda x: np.mean(x) - np.std(x),
+                fun_ymax=lambda x: np.mean(x) + np.std(x),
+            ),
         )
+        + pn.geom_point(
+            stat=pn.stat_summary(fun_y=np.mean),
+            size=3,
+        )
+        + pn.scale_fill_manual({
+            False: "black",
+            True: "red",
+        })
         + pn.scale_y_continuous(
             labels=mizani.formatters.percent_format()
         )
@@ -398,6 +517,8 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
     path = snakemake.params["output_basedir"] + f"/r2_bar_plot_proportional_difference.{feature_x}__vs__{feature_y}"
     pn.ggsave(plot, path + ".png", dpi=DPI)
     pn.ggsave(plot, path + ".pdf", dpi=DPI)
+    subset_plot_df.to_parquet(path + ".parquet", index=False)
+    subset_plot_df.to_csv(path + ".csv", index=False)
 
 
 # %% [markdown]

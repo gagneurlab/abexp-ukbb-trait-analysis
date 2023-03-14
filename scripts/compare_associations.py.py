@@ -82,8 +82,8 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'compare_associations',
         default_wildcards={
-            "comparison": "all",
-            # "comparison": "paper_figure",
+            # "comparison": "all",
+            "comparison": "paper_figure",
             # "comparison": "paper_figure_all_traits",
         }
     )
@@ -283,6 +283,9 @@ plot_df = plot_df.merge(feature_set_idx, on="feature_set", how="left")
 # %%
 plot_df 
 
+# %% {"tags": []}
+2 * plot_df["phenotype_col"].unique().size
+
 # %%
 plot = (
     pn.ggplot(plot_df, pn.aes(x="reorder(feature_set, index)", y="num_significant"))
@@ -295,7 +298,7 @@ plot = (
     )
     # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
     + pn.theme(
-        figure_size=(12, 2 * len(config["covariates"])),
+        figure_size=(2 + 2 * len(config["covariates"]), 1 * plot_df["phenotype_col"].unique().size),
         axis_text_x=pn.element_text(
             rotation=45,
             hjust=0.5
@@ -306,7 +309,7 @@ plot = (
         title=pn.element_text(linespacing=1.4),
     )
     + pn.facet_grid(
-        "covariates ~ phenotype_col",
+        "phenotype_col ~ covariates",
         scales="free_x"
     )
     # + pn.coord_cartesian()
@@ -321,8 +324,8 @@ snakemake.params["output_basedir"]
 
 # %%
 path = snakemake.params["output_basedir"] + "/num_significants"
-pn.ggsave(plot, path + ".png", dpi=DPI)
-pn.ggsave(plot, path + ".pdf", dpi=DPI)
+pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 
 # %% [markdown]
 # ## Pairwise venn diagrams
@@ -332,6 +335,10 @@ import itertools
 
 keys = adj_regression_results_pd_df["feature_set"].unique().tolist()
 
+# %% {"tags": []}
+keys
+
+# %%
 for feature_x, feature_y in list(itertools.combinations(keys, 2)):
     print(f"Plotting '{feature_x}' vs '{feature_y}'...")
     
@@ -382,6 +389,8 @@ import itertools
 
 keys = adj_regression_results_pd_df["feature_set"].unique().tolist()
 
+
+# %%
 for feature_x, feature_y in list(itertools.combinations(keys, 2)):
     print(f"Plotting '{feature_x}' vs '{feature_y}'...")
     
@@ -410,7 +419,7 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
     print(f"Saving to '{path}'")
     pn.ggsave(plot, path + ".png", dpi=DPI)
     pn.ggsave(plot, path + ".pdf", dpi=DPI)
-    
+
 
 # %% [markdown]
 # ## boxplot
@@ -475,7 +484,7 @@ plot = (
     )
     # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
     + pn.theme(
-        figure_size=(8, 8),
+        figure_size=(2 + 2 * len(config["covariates"]), 1 * plot_df["phenotype_col"].unique().size),
         axis_text_x=pn.element_text(
             rotation=45,
             hjust=1
@@ -487,7 +496,7 @@ plot = (
     )
     + pn.facet_grid(
         "phenotype_col ~ covariates",
-        scales="fixed"
+        scales="free_y"
     )
     # + pn.coord_flip()
 )
@@ -524,6 +533,7 @@ plot_df = adj_regression_results_pd_df.set_index([*grouping, "gene"]).unstack("f
 })
 plot_df.columns = [f"{b}.{a}" for a, b in plot_df.columns]
 
+# %%
 for feature_x, feature_y in list(itertools.combinations(keys, 2)):
     print(f"Plotting '{feature_x}' vs '{feature_y}'...")
     
@@ -575,7 +585,6 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
     print(f"Saving to '{path}'")
     pn.ggsave(plot, path + ".png", dpi=DPI)
     pn.ggsave(plot, path + ".pdf", dpi=DPI)
-
 
 
 # %% [markdown]
