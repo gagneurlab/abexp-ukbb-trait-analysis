@@ -66,12 +66,13 @@ except NameError:
         default_wildcards={
             #"phenotype_col": "standing_height",
             #"phenotype_col": "glycated_haemoglobin_hba1c",
-            "phenotype_col": "Lipoprotein_A",
+            #"phenotype_col": "Lipoprotein_A",
             #"phenotype_col": "BodyMassIndex",
             #"phenotype_col": "Triglycerides",
             #"phenotype_col": "LDL_direct",
             #"phenotype_col": "systolic_blood_pressure",
             #"phenotype_col": "HDL_cholesterol",
+            "phenotype_col": "Alanine_aminotransferase",
             #"feature_set": "LOFTEE_pLoF",
             "feature_set": "AbExp_all_tissues",
             "covariates": "sex_age_genPC_CLMP_PRS",
@@ -136,7 +137,7 @@ pred_df = (
     .assign(**{
         "phenotype_col": phenotype_col,
         "method": snakemake.wildcards["feature_set"],
-        "phenotype_quantile": np.array(pd.qcut(pred_df["measurement"], nr_of_quantiles, labels=False)),
+        #"phenotype_quantile": np.array(pd.qcut(pred_df["measurement"], nr_of_quantiles, labels=False)),
         "full_model_pred_quantile": np.array(pd.qcut(pred_df["full_model_pred"], nr_of_quantiles, labels=False)),
         "restricted_model_pred_quantile": np.array(pd.qcut(pred_df["restricted_model_pred"], nr_of_quantiles, labels=False)),
         "basic_model_pred_quantile": np.array(pd.qcut(pred_df["basic_model_pred"], nr_of_quantiles, labels=False)),
@@ -154,9 +155,9 @@ pred_df = (
         "full_model_pred_rank": pred_df["full_model_pred"].rank(ascending = False),
         "restricted_model_pred_rank": pred_df["restricted_model_pred"].rank(ascending = False),
         "basic_model_pred_rank": pred_df["basic_model_pred"].rank(ascending = False),
-        "at_risk_low": pred_df["phenotype_quantile"] == 0,
-        "at_risk_high": pred_df["phenotype_quantile"] == nr_of_quantiles-1,
-        "at_risk": np.abs(pred_df["measurement"] - pehnotype_mean) > 1 * phenotype_std,
+        #"at_risk_low": pred_df["phenotype_quantile"] == 0,
+        #"at_risk_high": pred_df["phenotype_quantile"] == nr_of_quantiles-1,
+        #"at_risk": np.abs(pred_df["measurement"] - pehnotype_mean) > 1 * phenotype_std,
         "full_model_new_risk": np.abs(pred_df["full_model_pred"] - pred_df["restricted_model_pred"]) > (1 * restricted_model_std)
     })
 )
@@ -179,10 +180,10 @@ prc_df = pd.concat([prc_baseline_df, prc_full_df])
 # ### Scatter Predictions
 
 # %%
-plot_df = pred_df[["phenotype_col", "measurement", "basic_model_pred", "restricted_model_pred", "full_model_pred", "full_model_new_risk", "at_risk"]].rename(columns={
+plot_df = pred_df[["phenotype_col", "measurement", "basic_model_pred", "restricted_model_pred", "full_model_pred", "full_model_new_risk"]].rename(columns={
     "restricted_model_pred": f"Age+Sex+PC+PRS \n r²={restricted_model_r2:.3f}" ,"full_model_pred": f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']} \n r²={full_model_r2:.3f}", "basic_model_pred": f"Age+Sex+PC \n r²={basic_model_r2:.3f}"
 })
-plot_df = plot_df.melt(id_vars=["phenotype_col", "measurement", "full_model_new_risk", "at_risk"])
+plot_df = plot_df.melt(id_vars=["phenotype_col", "measurement", "full_model_new_risk"])
 
 plot = (
     pn.ggplot(plot_df, pn.aes(y="measurement", x="value", color='full_model_new_risk'))
@@ -202,9 +203,6 @@ plot = (
 
 #pn.ggsave(plot = plot, filename = snakemake.output["predictions_plot_png"], dpi=DPI)
 display(plot)
-
-# %%
-pred_df.groupby(["full_model_new_risk", "at_risk"]).size()
 
 # %%
 plot_df = pred_df[["full_model_pred", "restricted_model_pred", "full_model_new_risk"]].rename(columns = {"full_model_pred": f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}", "restricted_model_pred": "Age+Sex+PC+PRS"})
