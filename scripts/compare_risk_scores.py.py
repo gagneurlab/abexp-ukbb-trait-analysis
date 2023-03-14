@@ -14,7 +14,7 @@
 #     name: conda-env-anaconda-florian4-py
 # ---
 
-# %%
+# %% {"tags": []}
 from IPython.display import display
 
 # %%
@@ -28,6 +28,8 @@ import yaml
 import pyspark
 import pyspark.sql.types as t
 import pyspark.sql.functions as f
+
+import sklearn.metrics
 
 # import glow
 
@@ -80,7 +82,7 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'compare_risk_scores',
         default_wildcards={
-            "comparison": "all", 
+            "comparison": "paper_figure", 
             # "comparison": "paper_figure", 
         }
     )
@@ -250,11 +252,11 @@ quantiles_df = (
 )
 quantiles_df.printSchema()
 
-# %%
+# %% {"tags": []}
 quantiles_pd_df = quantiles_df.toPandas()
 quantiles_pd_df
 
-# %%
+# %% {"tags": []}
 path = snakemake.params["output_basedir"] + f"/quantile_counts"
 quantiles_pd_df.to_csv(path + ".csv", index=False)
 quantiles_pd_df.to_parquet(path + ".parquet", index=False)
@@ -265,10 +267,10 @@ quantiles_pd_df.to_parquet(path + ".parquet", index=False)
 # %% [markdown]
 # ## scatter-plot r2
 
-# %%
+# %% {"tags": []}
 r2_score_df
 
-# %%
+# %% {"tags": []}
 plot_df = r2_score_df
 grouping = ['phenotype_col', 'feature_set', 'covariates']
 keys = plot_df["feature_set"].unique().tolist()
@@ -281,7 +283,7 @@ unstacked_plot_restricted_df
 # %% [markdown]
 # ### bar plot difference
 
-# %%
+# %% {"tags": []}
 import itertools
 
 # list(itertools.combinations(keys, 2))
@@ -340,7 +342,7 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
 # %% [markdown]
 # ### bar plot proportional difference
 
-# %%
+# %% {"tags": []}
 import itertools
 import mizani
 
@@ -741,5 +743,62 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
 
 # %%
 snakemake.output
+
+# %% [markdown]
+# ## JL plot
+
+# %% {"tags": []}
+pandas_df = predictions_df.toPandas()
+
+# %% {"tags": []}
+distance_std = 0.5
+distances_per_phenotype = pandas_df.groupby(["phenotype_col", "individual"]).first().groupby("phenotype_col").agg(distance_to_PRS=('restricted_model_pred', 'std'))* distance_std
+pandas_df = pd.merge(pandas_df, distances_per_phenotype, left_on="phenotype_col", right_index=True, how="left")
+pandas_df["updated"] = np.abs((pandas_df["restricted_model_pred"] - pandas_df["full_model_pred"])) > pandas_df["distance_to_PRS"]
+pandas_df["delta_abs_err"] = np.abs(pandas_df["measurement"]-pandas_df["full_model_pred"]) - np.abs(pandas_df["measurement"]-pandas_df["restricted_model_pred"])
+
+# %% {"tags": []}
+updates_df = pandas_df.query("updated").groupby(["phenotype_col", "method"]).size().reset_index().rename(columns={0 : "individuals"})
+
+# %% {"tags": []}
+plot1 = (
+    pn.ggplot(updates_df, pn.aes(y="individuals", x="method"))
+    + pn.ggtitle(f"Number of individuals where prediction differs by more than {distance_std} standard deviation(s) from common PRS")
+    + pn.geom_bar(stat="identity")
+    + pn.facet_wrap("phenotype_col", scales="free_y")
+    + pn.theme(
+            figure_size=(20, 10),
+            subplots_adjust={'wspace': 0.25},
+            axis_text_x=pn.element_text(
+                rotation=30,
+                # hjust=1
+            ),
+    )
+)
+display(plot1)
+
+# %% {"tags": []}
+plot = (
+        pn.ggplot(updates_df.query("phenotype_col != 'Basophill_count' and method.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").pivot(index="phenotype_col", columns="method", values='individuals').reset_index().fillna(0), pn.aes(x="LOFTEE_pLoF", y="AbExp_all_tissues", fill="phenotype_col"))
+        + pn.geom_point(size=3)
+        + pn.geom_abline(slope=1, color="black", linetype="dashed")
+        + pn.ggtitle(f"Number of individuals where prediction differs by more than {distance_std} standard deviation(s) from common PRS")
+        + pn.theme(
+            figure_size=(6, 4),
+            title=pn.element_text(linespacing=4, ha = "left"),
+        )
+)
+display(plot)
+
+# %% {"tags": []}
+plot = (
+        pn.ggplot(pandas_df.query("updated == True"), pn.aes(x="phenotype_col", y="delta_abs_err", fill="method"))
+        + pn.geom_boxplot()
+        + pn.ggtitle(f"Change in absolut error where prediction differs by more than {distance_std} standard deviation(s) from common PRS")
+        + pn.theme(figure_size=(6, 18))
+        + pn.scale_x_discrete(limits=sorted(pandas_df["phenotype_col"].unique().tolist(), reverse=True, key=str.casefold))
+        + pn.coord_flip()
+)
+display(plot)
 
 # %%
