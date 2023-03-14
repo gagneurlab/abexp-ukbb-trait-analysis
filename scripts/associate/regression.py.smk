@@ -25,9 +25,12 @@ rule associate__regression:
         featureset_config=f"{OUTPUT_BASEPATH}/config.yaml",
         protein_coding_genes_pq=config["protein_coding_genes_pq"],
         # covariates
-        covariates_ipc=f'''{COVARIATES_BASEPATH}/covariates.feather''',
+        covariates_pq=f'''{COVARIATES_BASEPATH}/covariates.parquet''',
+        # covariates_ipc=f'''{COVARIATES_BASEPATH}/covariates.feather''',
         # clumping
         clumping_variants_pq=f'''{COVARIATES_BASEPATH}/clumping_variants.parquet''',
+        # sample split
+        train_test_split_pq=f"{COVARIATES_BASEPATH}/train_test_split.parquet",
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",
         # age_col='age_when_attended_assessment_centre_f21003_0_0',

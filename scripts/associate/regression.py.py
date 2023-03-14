@@ -110,7 +110,8 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__regression',
         default_wildcards={
-            "phenotype_col": "CAD_SOFT",
+            # "phenotype_col": "CAD_SOFT",
+            "phenotype_col": "c_reactive_protein",
             # "phenotype_col": "severe_LDL",
             # "phenotype_col": "Asthma",
             # "phenotype_col": "Triglycerides",
@@ -125,8 +126,8 @@ except NameError:
             "feature_set": "max_AbExp",
             # "feature_set": "AbExp_all_tissues",
             # "feature_set": "LOFTEE_pLoF",
-            "covariates": "randomized_sex_age_genPC_CLMP_PRS",
-            # "covariates": "sex_age_genPC_CLMP_PRS",
+            # "covariates": "randomized_sex_age_genPC_CLMP_PRS",
+            "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex_age_genPC_CLMP",
             # "covariates": "sex_age_genPC",
         }
@@ -254,10 +255,25 @@ def deref(obj):
 # # Read covariates
 
 # %%
-snakemake.input["covariates_ipc"]
+snakemake.input["covariates_pq"]
+
+# %% {"tags": []}
+snakemake.input["train_test_split_pq"]
 
 # %%
-covariates_df = pl.scan_ipc(snakemake.input["covariates_ipc"])
+train_test_split_df = pl.scan_parquet(snakemake.input["train_test_split_pq"]).select("individual", "fold")
+train_test_split_df.schema
+
+# %%
+covariates_df = pl.scan_parquet(snakemake.input["covariates_pq"])
+covariates_df = (
+    covariates_df
+    .join(train_test_split_df, on="individual")
+    .filter(pl.col("fold") == pl.lit("association_testing"))
+)
+# covariates_df.schema
+
+# %% {"tags": []}
 covariates_df_columns = covariates_df.columns
 
 # %% [raw]
@@ -388,11 +404,12 @@ broadcast_clumping_variants_df = broadcast(clumping_variants_df)
 
 # %%
 from pyarrow import feather
+from pyarrow import parquet as pq
 import pyarrow as pa
 
 # %%
-data_df_schema = feather.read_table(
-    snakemake.input["covariates_ipc"],
+data_df_schema = pq.read_table(
+    snakemake.input["covariates_pq"],
     use_threads=False,
     memory_map=True,
     columns=[phenotype_col],

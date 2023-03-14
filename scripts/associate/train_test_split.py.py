@@ -32,7 +32,7 @@ snakefile_path = os.getcwd() + "/../../Snakefile"
 snakefile_path
 
 # %%
-# del snakemake
+#del snakemake
 
 # %%
 try:
@@ -44,7 +44,8 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'train_test_split',
         default_wildcards={
-            "phenotype_col": "systolic_blood_pressure",
+            "phenotype_col": "c_reactive_protein",
+            # "phenotype_col": "systolic_blood_pressure",
             # "phenotype_col": "systolic_blood_pressure_f4080_0_0",
             "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex+age+genPC+CLMP",
@@ -86,30 +87,45 @@ is_boolean_phenotype
 # %%
 import sklearn.model_selection
 
+# %% {"tags": []}
+snakemake.params
+
 # %%
 if is_boolean_phenotype:
     # train/test
-    train_test_split = sklearn.model_selection.StratifiedKFold(
-        n_splits=2,
+    # train_test_split = sklearn.model_selection.StratifiedKFold(
+    #     n_splits=2,
+    #     random_state=42,
+    #     shuffle=True,
+    # )
+    
+    # data for association testing
+    association_split = sklearn.model_selection.StratifiedShuffleSplit(
+        train_size=snakemake.params["assocation_split"],
         random_state=42,
-        shuffle=True,
     )
     # split train set into validation groups
     valid_split = sklearn.model_selection.StratifiedKFold(
-        n_splits=5,
+        n_splits=snakemake.params["phenotype_prediction_folds"],
         random_state=42,
         shuffle=True,
     )
 else:
-    # train/test
-    train_test_split = sklearn.model_selection.KFold(
-        n_splits=2,
+    # # train/test
+    # train_test_split = sklearn.model_selection.KFold(
+    #     n_splits=2,
+    #     random_state=42,
+    #     shuffle=True,
+    # )
+    
+    # data for association testing
+    association_split = sklearn.model_selection.ShuffleSplit(
+        train_size=snakemake.params["assocation_split"],
         random_state=42,
-        shuffle=True,
     )
     # split train set into validation groups
     valid_split = sklearn.model_selection.KFold(
-        n_splits=5,
+        n_splits=snakemake.params["phenotype_prediction_folds"],
         random_state=42,
         shuffle=True,
     )
@@ -117,18 +133,18 @@ else:
 
 # %%
 samples_df["fold"] = ""
-train_index, test_index = next(train_test_split.split(samples_df["individual"], samples_df[phenotype_col]))
-samples_df.loc[test_index, "fold"] = "test"
+association_index, train_index = next(association_split.split(samples_df["individual"], samples_df[phenotype_col]))
+samples_df.loc[association_index, "fold"] = "association_testing"
 
 for idx, (train_fold_index, test_fold_index) in enumerate(valid_split.split(train_index, samples_df[phenotype_col].iloc[train_index])):
     print(idx)
     print(test_fold_index)
     
     fold_index = train_index[test_fold_index]
-    samples_df.loc[fold_index, "fold"] = f"fold {idx}"
+    samples_df.loc[fold_index, "fold"] = f"fold {idx + 1}"
 
 # %%
-samples_df["fold"].value_counts()
+samples_df["fold"].value_counts().sort_index()
 
 # %%
 samples_df

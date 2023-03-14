@@ -18,6 +18,8 @@ rule associate__polygenic_risk_score:
     output:
         #prs_features_pq=directory(f"{OUTPUT_BASEPATH}/prs_features.parquet"),
         predictions_pq=f"{OUTPUT_BASEPATH}/predictions.parquet",
+        r2_scores_pq=f"{OUTPUT_BASEPATH}/r2_scores.parquet",
+        r2_scores_tsv=f"{OUTPUT_BASEPATH}/r2_scores.tsv",
         precision_recall_baseline_pq=f"{OUTPUT_BASEPATH}/precision_recall.baseline.parquet",
         precision_recall_full_pq=f"{OUTPUT_BASEPATH}/precision_recall.full.parquet",
         #prc_plot_png = f"{OUTPUT_BASEPATH}/precision_recall_plot.png",
