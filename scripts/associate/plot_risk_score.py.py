@@ -52,7 +52,7 @@ snakefile_path = os.getcwd() + "/../../Snakefile"
 snakefile_path
 
 # %%
-del snakemake
+# del snakemake
 
 # %%
 try:
@@ -187,11 +187,12 @@ plot_df = plot_df.melt(id_vars=["phenotype_col", "measurement", "full_model_new_
 
 plot = (
     pn.ggplot(plot_df, pn.aes(y="measurement", x="value", color='full_model_new_risk'))
-    + pn.ggtitle(f"Predictions of LGBM models for {phenotype_col} ({phenocode})")
+    + pn.ggtitle(f"Predictions of LGBM models for {phenotype_col}")
     + pn.geom_bin_2d(bins=100)
     + pn.geom_smooth(method="lm", color="red")
     + pn.facet_grid("phenotype_col ~ variable")
-    + pn.scale_fill_continuous(trans = "log10")
+    + pn.scale_fill_continuous(trans = "log10", cmap_name="binary")
+    #+ pn.scale_fill_continuous(trans = "log10")
     + pn.theme(figure_size=(12, 4))
     + pn.theme(title = pn.element_text(va = "top", linespacing = 4))
     + pn.coord_equal()
@@ -212,7 +213,8 @@ plot = (
     + pn.ggtitle(f"Predictions for {phenotype_col} of models on PRS vs. PRS + {snakemake.wildcards['feature_set']}")
     + pn.geom_bin_2d(bins=100)
     + pn.geom_smooth(method="lm", color="red")
-    + pn.scale_fill_continuous(trans = "log10")
+    + pn.scale_fill_continuous(trans = "log10", cmap_name="binary")
+    #+ pn.scale_fill_continuous(trans = "log10")
     + pn.scale_color_manual(values = {True: "orange", False: "None"})
 )
 display(plot)
