@@ -868,13 +868,32 @@ snakemake.output
 
 # %% {"tags": []}
 pandas_df = predictions_df.toPandas()
-
-# %% {"tags": []}
 distance_std = 0.5
 distances_per_phenotype = pandas_df.groupby(["phenotype_col", "individual"]).first().groupby("phenotype_col").agg(distance_to_PRS=('restricted_model_pred', 'std'))* distance_std
 pandas_df = pd.merge(pandas_df, distances_per_phenotype, left_on="phenotype_col", right_index=True, how="left")
-pandas_df["updated"] = np.abs((pandas_df["restricted_model_pred"] - pandas_df["full_model_pred"])) > pandas_df["distance_to_PRS"]
+pandas_df["full_model_update"] = np.abs((pandas_df["restricted_model_pred"] - pandas_df["full_model_pred"]))
+pandas_df["full_model_update_rank"] = pandas_df.groupby(["phenotype_col", "feature_set"])["full_model_update"].rank(method="first", ascending=False)
+pandas_df["updated"] = pandas_df["full_model_update"] > pandas_df["distance_to_PRS"]
 pandas_df["delta_abs_err"] = np.abs(pandas_df["measurement"]-pandas_df["full_model_pred"]) - np.abs(pandas_df["measurement"]-pandas_df["restricted_model_pred"])
+pandas_df["full_model_improvement_rank"] = pandas_df.groupby(["phenotype_col", "feature_set"])["delta_abs_err"].rank(method="first", ascending=True)
+
+
+# %% {"tags": []}
+def assign_percentiles(group, value_col="measurement", percentile=0.01):
+    bottom_percentile = percentile
+    top_percentile = 1 - percentile
+    # Calculate the percentiles for the group
+    bottom = group[value_col].quantile(bottom_percentile)
+    top = group[value_col].quantile(top_percentile)
+    # Assign the boolean values based on the percentiles
+    group['is_top_percentile'] = group[value_col] >= top
+    group['is_bottom_percentile'] = group[value_col] <= bottom
+    return group
+
+
+# %% {"tags": []}
+pandas_df = pandas_df.groupby(["phenotype_col", "feature_set"], group_keys=False).apply(assign_percentiles).reset_index(drop=True)
+pandas_df["is_extreme"] = pandas_df["is_top_percentile"] | pandas_df["is_bottom_percentile"]
 
 # %% {"tags": []}
 updates_df = pandas_df.query("updated").groupby(["phenotype_col", "feature_set"]).size().reset_index().rename(columns={0 : "individuals"})
@@ -916,6 +935,19 @@ plot = (
         + pn.theme(figure_size=(6, 18))
         + pn.scale_x_discrete(limits=sorted(pandas_df["phenotype_col"].unique().tolist(), reverse=True, key=str.casefold))
         + pn.coord_flip()
+)
+display(plot)
+
+# %%
+pandas_df["samples_in_extreme_percentiles"] = pandas_df.sort_values(["phenotype_col", "feature_set", "full_model_improvement_rank"]).groupby(["phenotype_col", "feature_set"])["is_extreme"].cumsum()
+
+# %% {"tags": []}
+plot = (
+    pn.ggplot(pandas_df.query("full_model_improvement_rank<1000 and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])"), pn.aes(x='full_model_improvement_rank', y='samples_in_extreme_percentiles', color='feature_set'))
+    + pn.geom_line() # line plot
+    + pn.theme(figure_size=(20, 15), subplots_adjust={'wspace': 0.25})
+    + pn.facet_wrap("phenotype_col", scales="free_y")
+    + pn.labs(x='Rank(Improvement in error PRS+feature_set vs. PRS)', y='Samples in top/bottom 1%')
 )
 display(plot)
 
