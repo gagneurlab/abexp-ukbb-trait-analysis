@@ -928,12 +928,31 @@ plot = (
 display(plot)
 
 # %% {"tags": []}
+errors_df = pandas_df.query("updated == True and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").groupby(["phenotype_col" ,"feature_set"])["delta_abs_err"].median().reset_index().pivot(index="phenotype_col", columns="feature_set", values='delta_abs_err').reset_index()
 plot = (
-        pn.ggplot(pandas_df.query("updated == True"), pn.aes(x="phenotype_col", y="delta_abs_err", fill="feature_set"))
+    pn.ggplot(errors_df,
+    pn.aes(x="LOFTEE_pLoF", y="AbExp_all_tissues", fill="phenotype_col"))
+    + pn.geom_point(size=3)
+        + pn.geom_abline(slope=1, color="black", linetype="dashed")
+        + pn.ggtitle(f"Median of change in absolute error where prediction differs by \nmore than {distance_std} standard deviation(s) from common PRS")
+        + pn.theme(
+            figure_size=(6, 4),
+        )
+)
+display(plot)
+
+# %%
+
+# %% {"tags": []}
+plot = (
+        pn.ggplot(
+            pandas_df.query("updated == True and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])"), 
+            pn.aes(x="reorder(phenotype_col, -delta_abs_err)", y="delta_abs_err", fill="feature_set")
+        )
         + pn.geom_boxplot(position=pn.positions.position_dodge(preserve="single"))
         + pn.ggtitle(f"Change in absolut error where prediction differs by more than {distance_std} standard deviation(s) from common PRS")
-        + pn.theme(figure_size=(6, 18))
-        + pn.scale_x_discrete(limits=sorted(pandas_df["phenotype_col"].unique().tolist(), reverse=True, key=str.casefold))
+        + pn.theme(figure_size=(6, 8))
+        #+ pn.scale_x_discrete(limits=sorted(pandas_df["phenotype_col"].unique().tolist(), reverse=True, key=str.casefold))
         + pn.coord_flip()
 )
 display(plot)
