@@ -868,13 +868,16 @@ snakemake.output
 
 # %% {"tags": []}
 pandas_df = predictions_df.toPandas()
-distance_std = 0.5
+distance_std = 1
 distances_per_phenotype = pandas_df.groupby(["phenotype_col", "individual"]).first().groupby("phenotype_col").agg(distance_to_PRS=('restricted_model_pred', 'std'))* distance_std
 pandas_df = pd.merge(pandas_df, distances_per_phenotype, left_on="phenotype_col", right_index=True, how="left")
 pandas_df["full_model_update"] = np.abs((pandas_df["restricted_model_pred"] - pandas_df["full_model_pred"]))
 pandas_df["full_model_update_rank"] = pandas_df.groupby(["phenotype_col", "feature_set"])["full_model_update"].rank(method="first", ascending=False)
 pandas_df["updated"] = pandas_df["full_model_update"] > pandas_df["distance_to_PRS"]
 pandas_df["delta_abs_err"] = np.abs(pandas_df["measurement"]-pandas_df["full_model_pred"]) - np.abs(pandas_df["measurement"]-pandas_df["restricted_model_pred"])
+pandas_df[f"full_model_reduces_error"] = pandas_df["delta_abs_err"] < ((-1) * pandas_df["distance_to_PRS"])
+pandas_df[f"full_model_increases_error"] = pandas_df["delta_abs_err"] > pandas_df["distance_to_PRS"]
+pandas_df["full_model_improvement"] = pandas_df.apply(lambda r: "reduce" if r["full_model_reduces_error"] else ("increase" if r["full_model_increases_error"] else "none"), axis=1)
 pandas_df["full_model_improvement_rank"] = pandas_df.groupby(["phenotype_col", "feature_set"])["delta_abs_err"].rank(method="first", ascending=True)
 
 
@@ -896,11 +899,42 @@ pandas_df = pandas_df.groupby(["phenotype_col", "feature_set"], group_keys=False
 pandas_df["is_extreme"] = pandas_df["is_top_percentile"] | pandas_df["is_bottom_percentile"]
 
 # %% {"tags": []}
-updates_df = pandas_df.query("updated").groupby(["phenotype_col", "feature_set"]).size().reset_index().rename(columns={0 : "individuals"})
+updates_df = pandas_df.query("updated").groupby(["phenotype_col", "feature_set", "full_model_improvement"]).size().reset_index().rename(columns={0 : "individuals"})
+improvements_df = pandas_df.groupby(["phenotype_col", "feature_set", "full_model_improvement"]).size().unstack(fill_value=0).stack().reset_index().rename(columns={0 : "individuals"})
+
+# %% [raw] {"tags": []}
+# plot_df = improvements_df.query("full_model_improvement!='none' and phenotype_col != 'Basophill_count' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").pivot(index=["phenotype_col", "feature_set"], columns="full_model_improvement", values='individuals').reset_index().fillna(0)
+# plot = (
+#         pn.ggplot(plot_df, pn.aes(x="phenotype_col", fill = "feature_set"))
+#         + pn.geom_col(pn.aes(y="-increase"),position = 'dodge')
+#         + pn.geom_col(pn.aes(y="reduce"),position = 'dodge')
+#         + pn.geom_hline(pn.aes(yintercept = 0))
+#         + pn.ggtitle(f"Number of individuals where the absolute error compared\n to common PRS changes by more than {distance_std} standard deviation(s)")
+#         + pn.theme(
+#             figure_size=(4, 10),
+#         )
+#         + pn.scale_x_discrete(limits=plot_df.query("feature_set=='AbExp_all_tissues'").sort_values("reduce")["phenotype_col"].to_list())
+#         + pn.coord_flip()
+#         + pn.labs(y='increase | decrease', x="phenotype_col")
+# )
+# display(plot)
+
+# %% {"tags": []}
+plot = (
+        pn.ggplot(improvements_df.query("full_model_improvement!='none' and phenotype_col != 'Basophill_count' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").pivot(index=["phenotype_col", "full_model_improvement"], columns="feature_set", values='individuals').reset_index().fillna(0), pn.aes(x="LOFTEE_pLoF", y="AbExp_all_tissues", fill="phenotype_col"))
+        + pn.geom_point(size=3)
+        + pn.facet_wrap("full_model_improvement")
+        + pn.geom_abline(slope=1, color="black", linetype="dashed")
+        + pn.ggtitle(f"Number of individuals where the absolute error compared\n to common PRS changes by more than {distance_std} standard deviation(s)")
+        + pn.theme(
+            figure_size=(6, 4),
+        )
+)
+display(plot)
 
 # %% {"tags": []}
 plot1 = (
-    pn.ggplot(updates_df, pn.aes(y="individuals", x="feature_set"))
+    pn.ggplot(updates_df, pn.aes(y="individuals", x="feature_set", fill="full_model_improvement"))
     + pn.ggtitle(f"Number of individuals where prediction differs by more than {distance_std} standard deviation(s) from common PRS")
     + pn.geom_bar(stat="identity")
     + pn.facet_wrap("phenotype_col", scales="free_y")
@@ -916,9 +950,14 @@ plot1 = (
 display(plot1)
 
 # %% {"tags": []}
+
+# %% {"tags": []}
+plot_df = updates_df.query("phenotype_col != 'Basophill_count' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").pivot(index=["phenotype_col", "full_model_improvement"], columns="feature_set", values='individuals').reset_index().fillna(0)
+plot_df = plot_df.groupby("phenotype_col")[["AbExp_all_tissues","LOFTEE_pLoF"]].sum().reset_index()
 plot = (
-        pn.ggplot(updates_df.query("phenotype_col != 'Basophill_count' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").pivot(index="phenotype_col", columns="feature_set", values='individuals').reset_index().fillna(0), pn.aes(x="LOFTEE_pLoF", y="AbExp_all_tissues", fill="phenotype_col"))
+        pn.ggplot(plot_df, pn.aes(x="LOFTEE_pLoF", y="AbExp_all_tissues", fill="phenotype_col"))
         + pn.geom_point(size=3)
+        #+ pn.facet_wrap("full_model_improvement")
         + pn.geom_abline(slope=1, color="black", linetype="dashed")
         + pn.ggtitle(f"Number of individuals where prediction differs by \nmore than {distance_std} standard deviation(s) from common PRS")
         + pn.theme(
@@ -969,5 +1008,44 @@ plot = (
     + pn.labs(x='Rank(Improvement in error PRS+feature_set vs. PRS)', y='Samples in top/bottom 1%')
 )
 display(plot)
+
+# %% [raw]
+# res = []
+# distance_std = [0.5, 1, 1.5, 2]
+# for distance in distance_std:
+#     print(distance)
+#     pandas_df = predictions_df.toPandas()
+#     distances_per_phenotype = pandas_df.groupby(["phenotype_col", "individual"]).first().groupby("phenotype_col").agg(distance_to_PRS=('restricted_model_pred', 'std'))* distance
+#     pandas_df = pd.merge(pandas_df, distances_per_phenotype, left_on="phenotype_col", right_index=True, how="left")
+#     pandas_df["full_model_update"] = np.abs((pandas_df["restricted_model_pred"] - pandas_df["full_model_pred"]))
+#     pandas_df["full_model_update_rank"] = pandas_df.groupby(["phenotype_col", "feature_set"])["full_model_update"].rank(method="first", ascending=False)
+#     pandas_df["updated"] = pandas_df["full_model_update"] > pandas_df["distance_to_PRS"]
+#     pandas_df["delta_abs_err"] = np.abs(pandas_df["measurement"]-pandas_df["full_model_pred"]) - np.abs(pandas_df["measurement"]-pandas_df["restricted_model_pred"])
+#     pandas_df[f"full_model_reduces_error"] = pandas_df["delta_abs_err"] < ((-1) * pandas_df["distance_to_PRS"])
+#     pandas_df[f"full_model_increases_error"] = pandas_df["delta_abs_err"] > pandas_df["distance_to_PRS"]
+#     pandas_df["full_model_improvement"] = pandas_df.apply(lambda r: "reduce" if r["full_model_reduces_error"] else ("increase" if r["full_model_increases_error"] else "none"), axis=1)
+#     pandas_df["full_model_improvement_rank"] = pandas_df.groupby(["phenotype_col", "feature_set"])["delta_abs_err"].rank(method="first", ascending=True)
+#     improvements_df = pandas_df.groupby(["phenotype_col", "feature_set", "full_model_improvement"]).size().unstack(fill_value=0).stack().reset_index().rename(columns={0 : "individuals"})
+#     improvements_df["sd_cutoff"] = distance
+#     res.append(improvements_df)
+# improvements_df = pd.concat(res)
+
+# %% [raw] {"tags": []}
+# plot_df = improvements_df.query("full_model_improvement!='none' and phenotype_col != 'Basophill_count' and sd_cutoff!=0.5 and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").pivot(index=["phenotype_col", "feature_set", "sd_cutoff"], columns="full_model_improvement", values='individuals').reset_index().fillna(0)
+# plot = (
+#         pn.ggplot(plot_df, pn.aes(x="phenotype_col", fill = "feature_set", width=1))
+#         + pn.geom_col(pn.aes(y="-increase"),position=pn.positions.position_dodge(preserve='single'))
+#         + pn.geom_col(pn.aes(y="reduce"),position=pn.positions.position_dodge(preserve='single'))
+#         + pn.geom_hline(pn.aes(yintercept = 0))
+#         + pn.ggtitle(f"Number of individuals where the absolute error compared\n to common PRS changes by more than {distance_std} standard deviation(s)")
+#         + pn.theme(
+#             figure_size=(8, 8),
+#         )
+#         + pn.facet_wrap("sd_cutoff")
+#         + pn.scale_x_discrete(limits=plot_df.query("feature_set=='AbExp_all_tissues' and sd_cutoff==1").sort_values("reduce")["phenotype_col"].to_list())
+#         + pn.coord_flip()
+#         + pn.labs(y='<-increase | decrease->', x="phenotype_col")
+# )
+# display(plot)
 
 # %%
