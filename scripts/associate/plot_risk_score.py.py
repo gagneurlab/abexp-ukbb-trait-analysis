@@ -14,7 +14,7 @@
 #     name: conda-env-anaconda-florian4-py
 # ---
 
-# %%
+# %% {"tags": []}
 from IPython.display import display
 
 import os
@@ -52,14 +52,14 @@ from snakemk_util import pretty_print_snakemake
 from rep.notebook_init import setup_plot_style
 setup_plot_style()
 
-# %%
+# %% {"tags": []}
 snakefile_path = os.getcwd() + "/../../Snakefile"
 snakefile_path
 
-# %%
-#del snakemake
+# %% {"tags": []}
+# del snakemake
 
-# %%
+# %% {"tags": []}
 try:
     snakemake
 except NameError:

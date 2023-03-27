@@ -424,8 +424,8 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
     display(plot)
     
     path = snakemake.params["output_basedir"] + f"/r2_bar_plot_difference.{feature_x}__vs__{feature_y}"
-    pn.ggsave(plot, path + ".png", dpi=DPI)
-    pn.ggsave(plot, path + ".pdf", dpi=DPI)
+    pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
     subset_plot_df.to_parquet(path + ".parquet", index=False)
     subset_plot_df.to_csv(path + ".csv", index=False)
 
@@ -515,8 +515,8 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
     display(plot)
     
     path = snakemake.params["output_basedir"] + f"/r2_bar_plot_proportional_difference.{feature_x}__vs__{feature_y}"
-    pn.ggsave(plot, path + ".png", dpi=DPI)
-    pn.ggsave(plot, path + ".pdf", dpi=DPI)
+    pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
     subset_plot_df.to_parquet(path + ".parquet", index=False)
     subset_plot_df.to_csv(path + ".csv", index=False)
 
@@ -584,8 +584,8 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
     display(plot)
     
     path = snakemake.params["output_basedir"] + f"/r2_scatter.{feature_x}__vs__{feature_y}"
-    pn.ggsave(plot, path + ".png", dpi=DPI)
-    pn.ggsave(plot, path + ".pdf", dpi=DPI)
+    pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 
 
 # %% [markdown]
