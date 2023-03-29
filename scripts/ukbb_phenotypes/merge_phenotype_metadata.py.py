@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.10.2
+#       jupytext_version: 1.14.0
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -85,7 +85,8 @@ except NameError:
     )
 
 # %%
-print(json.dumps(snakemake.__dict__, indent=2, default=str))
+from snakemk_util import pretty_print_snakemake
+print(pretty_print_snakemake(snakemake))
 
 # %%
 os.getcwd()

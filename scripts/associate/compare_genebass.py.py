@@ -82,8 +82,9 @@ except NameError:
         }
     )
 
-# %%
-print(json.dumps(snakemake.__dict__, indent=2, default=str))
+# %% {"tags": []}
+from snakemk_util import pretty_print_snakemake
+print(pretty_print_snakemake(snakemake))
 
 # %%
 if "plot_dpi" in snakemake.params:
