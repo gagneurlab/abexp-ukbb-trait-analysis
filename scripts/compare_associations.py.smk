@@ -17,14 +17,23 @@ def _compare_associations_input_fn(wildcards, yaml_path=YAML_PATH):
         config=yaml.safe_load(fd)
     
     input_files={
-        k: expand(
-            v,
+        **{
+            k: expand(
+                v,
+                # feature_set_basepath + '/config.yaml',
+                phenotype_col=config["phenotypes"], 
+                feature_set=config["features_sets"],
+                covariates=config["covariates"],
+            )
+            for k, v in rules.associate__regression.output.items()
+        },
+        "genebass_done": expand(
+            rules.associate__regression.output["touch_file"],
             # feature_set_basepath + '/config.yaml',
             phenotype_col=config["phenotypes"], 
             feature_set=config["features_sets"],
             covariates=config["covariates"],
         )
-        for k, v in rules.associate__regression.output.items()
     }
     
     return input_files

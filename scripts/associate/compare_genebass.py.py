@@ -495,4 +495,12 @@ stats_df.reset_index().to_parquet(snakemake.output["significant_genes_pq"], inde
 stats_df.reset_index().to_csv(snakemake.output["significant_genes_tsv"], index=False, header=True, sep="\t")
 
 # %%
+(
+    stats_df
+    .query(f"padj < {snakemake.params['pval_cutoff']}")
+    .reset_index()
+    .to_csv(snakemake.output["newly_found_genes_tsv"], index=False, header=True, sep="\t")
+)
+
+# %%
 

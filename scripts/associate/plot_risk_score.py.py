@@ -138,9 +138,6 @@ phenotype_std = pred_df["measurement"].std()
 measurement_std
 
 # %% {"tags": []}
-pred_df["measurement"].hist(bins=100)
-
-# %% {"tags": []}
 nr_of_quantiles = 10
 
 pred_df = (
@@ -169,7 +166,7 @@ pred_df = (
         #"at_risk_low": pred_df["phenotype_quantile"] == 0,
         #"at_risk_high": pred_df["phenotype_quantile"] == nr_of_quantiles-1,
         #"at_risk": np.abs(pred_df["measurement"] - pehnotype_mean) > 1 * phenotype_std,
-        "full_model_new_risk": np.abs(pred_df["full_model_pred"] - pred_df["restricted_model_pred"]) > (1 * restricted_model_std)
+        "full_model_new_risk": np.abs(pred_df["full_model_pred"] - pred_df["restricted_model_pred"]) > measurement_std
     })
 )
 pred_df

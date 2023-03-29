@@ -151,5 +151,6 @@ rule all:
         #     phenotype_col=all_phenotypes,
         #     covariates=["sex_age_genPC_CLMP_PRS"]
         # ),
+        rules.compose_paper_figure.output, 
 
 localrules: all

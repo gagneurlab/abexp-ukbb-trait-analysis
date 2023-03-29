@@ -19,14 +19,22 @@ def _compare_risk_scores_input_fn(wildcards, yaml_path=YAML_PATH, feature_set_ba
         config=yaml.safe_load(fd)
     
     input_files={
-        k: expand(
-            v,
-            # feature_set_basepath + '/config.yaml',
+        **{
+            k: expand(
+                v,
+                # feature_set_basepath + '/config.yaml',
+                phenotype_col=config["phenotypes"], 
+                feature_set=config["features_sets"],
+                covariates=config["covariates"],
+            )
+            for k, v in rules.associate__polygenic_risk_score.output.items()
+        },
+        "plot_risk_scores_done": expand(
+            rules.associate__plot_risk_score.output["plotting_done"],
             phenotype_col=config["phenotypes"], 
             feature_set=config["features_sets"],
             covariates=config["covariates"],
         )
-        for k, v in rules.associate__polygenic_risk_score.output.items()
     }
     
     return input_files

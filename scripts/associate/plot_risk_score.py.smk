@@ -17,7 +17,7 @@ rule associate__plot_risk_score:
         mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
     input: **rules.associate__polygenic_risk_score.output
     output:
-        plots_done=touch(f"{OUTPUT_BASEPATH}/plotting.done"),
+        plotting_done=touch(f"{OUTPUT_BASEPATH}/plotting.done"),
         # protein_coding_genes_pq=config["protein_coding_genes_pq"],
         # associations_pq=f"{ASSOCIATION_BASEPATH}/associations.parquet",
         # featureset_config=f"{ASSOCIATION_BASEPATH}/config.yaml",

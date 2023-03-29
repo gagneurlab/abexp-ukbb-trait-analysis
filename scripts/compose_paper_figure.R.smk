@@ -30,7 +30,7 @@ rule compose_paper_figure:
                 )
                 for k, v in rules.compare_risk_scores.output.items()
             },
-            "Alanine_aminotransferase": rules.associate__plot_risk_score.output["plots_done"].format(**{
+            "Alanine_aminotransferase": rules.associate__plot_risk_score.output["plotting_done"].format(**{
                 "phenotype_col": "Alanine_aminotransferase",
                 "feature_set": "AbExp_all_tissues",
                 "covariates": "sex_age_genPC_CLMP_PRS"
