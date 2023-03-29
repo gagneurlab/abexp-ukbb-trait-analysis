@@ -521,8 +521,8 @@ pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 
 # %%
 path = snakemake.params["output_basedir"] + "/rsquared_diff.free_y"
-pn.ggsave(plot + pn.facet_grid("phenotype_col ~ covariates", scales="free_y"), path + ".png", dpi=DPI)
-pn.ggsave(plot + pn.facet_grid("phenotype_col ~ covariates", scales="free_y"), path + ".pdf", dpi=DPI)
+pn.ggsave(plot + pn.facet_grid("phenotype_col ~ covariates", scales="free_y"), path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot + pn.facet_grid("phenotype_col ~ covariates", scales="free_y"), path + ".pdf", dpi=DPI, limitsize=False)
 
 # %% [markdown]
 # ## scatter plot r²-diff

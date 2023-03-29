@@ -69,7 +69,15 @@ library(ggpubr)
 library(ggtext)
 library(patchwork)
 library(grid)
-library(gridExtra) 
+library(gridExtra)
+
+# %% tags=[]
+# CairoSVG function for ggplot2 -------------------------------------------
+# Solves some issues with standard svg device - mainly usage of symbols
+cairosvg <- function(filename, width, height){
+  library(Cairo)
+  CairoSVG(file = filename, width = width, height = height)
+}
 
 # %% tags=[]
 # Set display size of plots
@@ -161,6 +169,9 @@ plot_1 = (
 )
 
 plot_1
+
+# %% tags=[]
+plot_1 + geom_text_repel(aes(label=`phenotype_col`))
 
 # %% tags=[]
 path = paste0(snakemake@params$output_basedir, "/num_significants")
@@ -326,7 +337,7 @@ plot_4 = (
     # + geom_bar(
     #     stat=stat_summary(fun_y=np.mean),
     # )
-    + scale_x_discrete(phenotype_label_order)
+    + scale_x_discrete(breaks=phenotype_label_order)
     + stat_summary(
         fun.ymin=function(x){ mean(x) - sd(x) },
         fun.ymax=function(x){ mean(x) + sd(x) },
@@ -400,7 +411,7 @@ plot_5 = (
     # + geom_col(aes(y="-increase"), position=positions.position_dodge(preserve='single'), alpha=0.5)
     # + geom_col(aes(y="reduce"), position=positions.position_dodge(preserve='single'))
     + geom_hline(aes(yintercept = 0))
-    + scale_x_discrete(phenotype_label_order)
+    + scale_x_discrete(breaks=phenotype_label_order)
     + theme(
         # figure_size=(8, 8),
     )
@@ -439,16 +450,18 @@ lower_lhs = (
     (
         plot_4 
         + ggtitle(NULL)
+        + xlab("")
         + ylab("proportional difference in r² between\n AbExp-DNA and LOFTEE pLoF")
         + theme(
-            axis.title.y = element_blank(),
+            # axis.title.y = element_blank(),
             legend.position = "bottom"
             # legend.title = element_text("Nr. of individuals")
             # legend.title = element_blank(),
         )
-    ) + (
+    ) 
+    + (
         plot_5
-        + facet_wrap("sd_cutoff_label")
+        # + facet_wrap("sd_cutoff_label")
         + scale_fill_discrete(
             name="",
             labels=c(
@@ -467,6 +480,7 @@ lower_lhs = (
             legend.position = "bottom"
         )
     )
+    + ylab("proportional difference in r² between\n AbExp-DNA and LOFTEE pLoF")
     + plot_layout(widths = c(1, 2))
     & theme(plot.margin = margin(0,0,0,0))
 )
@@ -557,6 +571,7 @@ commonplot
 path = paste0(snakemake@params$output_basedir, "/paper_figure")
 print(paste0("Saving to ", path, "..."))
 ggsave(paste0(path, ".png"), commonplot, width = 16, height = 12, dpi=600, type = "cairo")
+ggsave(paste0(path, ".svg"), commonplot, width = 16, height = 12, dpi=600, device=svg)
 ggsave(paste0(path, ".pdf"), commonplot, width = 16, height = 12, dpi=600, device=cairo_pdf)
 
 display_png(file=paste0(path, ".png"))
