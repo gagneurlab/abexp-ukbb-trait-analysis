@@ -15,7 +15,7 @@ phenotypes:
 - "Apolipoprotein_A"
 - "Apolipoprotein_B"
 - "Aspartate_aminotransferase"
-- "Basophill_count"
+# - "Basophill_count"
 # - "Basophill_percentage"
 - "Calcium"
 - "Cholesterol"

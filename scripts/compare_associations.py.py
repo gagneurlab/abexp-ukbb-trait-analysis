@@ -88,8 +88,13 @@ except NameError:
         }
     )
 
+# %% {"tags": []}
+# uncomment this to reload the Snakemake object after editing the rule input/output/params
+# snakemake.reload()
+
 # %%
-print(json.dumps(snakemake.__dict__, indent=2, default=str))
+from snakemk_util import pretty_print_snakemake
+print(pretty_print_snakemake(snakemake))
 
 # %%
 if "plot_dpi" in snakemake.params:
@@ -283,9 +288,6 @@ plot_df = plot_df.merge(feature_set_idx, on="feature_set", how="left")
 # %%
 plot_df 
 
-# %% {"tags": []}
-2 * plot_df["phenotype_col"].unique().size
-
 # %%
 plot = (
     pn.ggplot(plot_df, pn.aes(x="reorder(feature_set, index)", y="num_significant"))
@@ -384,6 +386,11 @@ plot_df = plot_df.assign(
 )
 plot_df
 
+# %% {"tags": []}
+path=snakemake.params["output_basedir"] + "/num_significants.scatter_plot"
+plot_df.to_parquet(path + ".parquet", index=False)
+plot_df.to_csv(path + ".csv", index=False)
+
 # %%
 import itertools
 
@@ -417,8 +424,8 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
     path = snakemake.params["output_basedir"] + f"/num_significants.scatter_plot@{feature_x}__vs__{feature_y}"
     
     print(f"Saving to '{path}'")
-    pn.ggsave(plot, path + ".png", dpi=DPI)
-    pn.ggsave(plot, path + ".pdf", dpi=DPI)
+    pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 
 
 # %% [markdown]
@@ -509,8 +516,8 @@ snakemake.params["output_basedir"]
 
 # %%
 path = snakemake.params["output_basedir"] + "/rsquared_diff"
-pn.ggsave(plot, path + ".png", dpi=DPI)
-pn.ggsave(plot, path + ".pdf", dpi=DPI)
+pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 
 # %%
 path = snakemake.params["output_basedir"] + "/rsquared_diff.free_y"
@@ -583,8 +590,8 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
     path = snakemake.params["output_basedir"] + f"/feature_comp.r2_diff@{feature_x}__vs__{feature_y}"
     
     print(f"Saving to '{path}'")
-    pn.ggsave(plot, path + ".png", dpi=DPI)
-    pn.ggsave(plot, path + ".pdf", dpi=DPI)
+    pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 
 
 # %% [markdown]
@@ -702,8 +709,8 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
     path = snakemake.params["output_basedir"] + f"/feature_comp.padj@{feature_x}__vs__{feature_y}"
     
     print(f"Saving to '{path}'")
-    pn.ggsave(plot, path + ".png", dpi=DPI)
-    pn.ggsave(plot, path + ".pdf", dpi=DPI)
+    pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 
 
 
@@ -792,8 +799,8 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
     path = snakemake.params["output_basedir"] + f"/feature_comp.padj_cropped@{feature_x}__vs__{feature_y}"
     
     print(f"Saving to '{path}'")
-    pn.ggsave(plot, path + ".png", dpi=DPI)
-    pn.ggsave(plot, path + ".pdf", dpi=DPI)
+    pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 
 
 

@@ -14,10 +14,10 @@
 #     name: conda-env-anaconda-florian4-py
 # ---
 
-# %%
+# %% {"tags": []}
 from IPython.display import display
 
-# %%
+# %% {"tags": []}
 import os
 import numpy as np
 import pandas as pd
@@ -32,25 +32,25 @@ import pyspark.sql.functions as f
 # import glow
 
 
-# %%
+# %% {"tags": []}
 import plotnine as pn
 # import seaborn as sns
 
 import matplotlib
 import matplotlib.pyplot as plt
 
-# %%
+# %% {"tags": []}
 import textwrap
 
-# %%
+# %% {"tags": []}
 from rep.notebook_init import setup_plot_style
 setup_plot_style()
 
-# %%
+# %% {"tags": []}
 # %matplotlib inline
 # %config InlineBackend.figure_format='retina'
 
-# %%
+# %% {"tags": []}
 # import os
 # # os.environ["RAY_ADDRESS"] = os.environ.get("RAY_ADDRESS", 'ray://192.168.16.30:10001')
 # os.environ["RAY_ADDRESS"] = 'ray://192.168.16.28:10001'
@@ -60,17 +60,17 @@ setup_plot_style()
 from rep.notebook_init import init_spark
 spark = init_spark(enable_glow=False)
 
-# %%
+# %% {"tags": []}
 spark
 
-# %%
+# %% {"tags": []}
 snakefile_path = os.getcwd() + "/../Snakefile"
 snakefile_path
 
-# %%
+# %% {"tags": []}
 # del snakemake
 
-# %%
+# %% {"tags": []}
 try:
     snakemake
 except NameError:
@@ -85,10 +85,10 @@ except NameError:
         }
     )
 
-# %%
+# %% {"tags": []}
 print(json.dumps(snakemake.__dict__, indent=2, default=str))
 
-# %%
+# %% {"tags": []}
 if "plot_dpi" in snakemake.params:
     DPI = snakemake.params["plot_dpi"]
 else:
@@ -97,14 +97,14 @@ else:
 # %% [markdown] {"tags": []}
 # # Load configuration
 
-# %%
+# %% {"tags": []}
 with open(snakemake.params["config_yaml"], "r") as fd:
     config = yaml.safe_load(fd)
 
-# %%
+# %% {"tags": []}
 print(json.dumps(config, indent=2, default=str))
 
-# %%
+# %% {"tags": []}
 pval_cutoff = config["pval_cutoff"]
 pval_cutoff
 
@@ -117,7 +117,7 @@ pval_cutoff
 # %% {"tags": []}
 snakemake.input["predictions_pq"]
 
-# %%
+# %% {"tags": []}
 predictions_df = (
     spark.read.parquet(*snakemake.input["predictions_pq"])
 )
@@ -126,10 +126,10 @@ predictions_df.printSchema()
 # %% [markdown]
 # ## compute r2 scores
 
-# %%
+# %% {"tags": []}
 from sklearn.metrics import r2_score
 
-# %%
+# %% {"tags": []}
 r2_score_df = []
 for path in snakemake.input["predictions_pq"]:
     df = pd.read_parquet(path)
@@ -148,7 +148,7 @@ for path in snakemake.input["predictions_pq"]:
 r2_score_df = pd.concat(r2_score_df).reset_index(drop=True)
 r2_score_df
 
-# %%
+# %% {"tags": []}
 path = snakemake.params["output_basedir"] + f"/rsquared"
 r2_score_df.to_csv(path + ".csv", index=False)
 r2_score_df.to_parquet(path + ".parquet", index=False)
@@ -166,7 +166,7 @@ fold_r2_score_df.to_parquet(path + ".parquet", index=False)
 # %% [markdown]
 # ## compute ranks
 
-# %%
+# %% {"tags": []}
 def assign_ranks(df: pd.DataFrame):
     df = df.assign(**{
         "measurement_rank": df["measurement"].rank(pct=True),
@@ -184,10 +184,10 @@ def assign_ranks(df: pd.DataFrame):
     return df
 
 
-# %%
+# %% {"tags": []}
 from copy import deepcopy
 
-# %%
+# %% {"tags": []}
 returned_schema = (
     deepcopy(predictions_df.schema)
     .add("measurement_rank", t.DoubleType())
@@ -197,17 +197,17 @@ returned_schema = (
     .add("total", t.LongType())
 )
 
-# %%
+# %% {"tags": []}
 transformed_predictions_df = (
     predictions_df
     .groupby(["phenotype_col", "feature_set", "covariates"])
     .applyInPandas(assign_ranks, schema=returned_schema)
 )
 
-# %%
+# %% {"tags": []}
 transformed_predictions_df.printSchema()
 
-# %%
+# %% {"tags": []}
 target_quantiles = [0.01, 0.05, 0.1, 0.2]
 # lower_upper = ["lower", "upper"]
 
@@ -218,10 +218,10 @@ target_quantiles_df = (
 )
 target_quantiles_df
 
-# %%
+# %% {"tags": []}
 target_quantiles_sdf = spark.createDataFrame(target_quantiles_df)
 
-# %%
+# %% {"tags": []}
 quantiles_df = (
     transformed_predictions_df.crossJoin(target_quantiles_sdf)
     .groupby([*target_quantiles_sdf.columns, "phenotype_col", "feature_set", "covariates"])
@@ -259,16 +259,16 @@ quantiles_df = (
 )
 quantiles_df.printSchema()
 
-# %%
+# %% {"tags": []}
 quantiles_pd_df = quantiles_df.toPandas()
 quantiles_pd_df
 
-# %%
+# %% {"tags": []}
 path = snakemake.params["output_basedir"] + f"/quantile_counts"
 quantiles_pd_df.to_csv(path + ".csv", index=False)
 quantiles_pd_df.to_parquet(path + ".parquet", index=False)
 
-# %%
+# %% {"tags": []}
 fold_quantiles_df = (
     transformed_predictions_df.crossJoin(target_quantiles_sdf)
     .groupby([*target_quantiles_sdf.columns, "phenotype_col", "feature_set", "covariates", "fold"])
@@ -306,11 +306,11 @@ fold_quantiles_df = (
 )
 fold_quantiles_df.printSchema()
 
-# %%
+# %% {"tags": []}
 fold_quantiles_pd_df = fold_quantiles_df.toPandas()
 fold_quantiles_pd_df
 
-# %%
+# %% {"tags": []}
 path = snakemake.params["output_basedir"] + f"/fold_quantile_counts"
 fold_quantiles_pd_df.to_csv(path + ".csv", index=False)
 fold_quantiles_pd_df.to_parquet(path + ".parquet", index=False)
@@ -321,13 +321,13 @@ fold_quantiles_pd_df.to_parquet(path + ".parquet", index=False)
 # %% [markdown]
 # ## scatter-plot r2
 
-# %%
+# %% {"tags": []}
 fold_r2_score_df
 
-# %%
+# %% {"tags": []}
 r2_score_df
 
-# %%
+# %% {"tags": []}
 plot_df = fold_r2_score_df
 grouping = ['phenotype_col', 'feature_set', 'covariates', 'fold']
 keys = plot_df["feature_set"].unique().tolist()
@@ -347,7 +347,7 @@ unstacked_plot_restricted_df
 # %% {"tags": []}
 from scipy.stats import wilcoxon
 
-# %% {"jupyter": {"outputs_hidden": true}, "tags": []}
+# %% {"tags": []}
 import itertools
 
 # list(itertools.combinations(keys, 2))
@@ -433,7 +433,7 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
 # %% [markdown]
 # ### bar plot proportional difference
 
-# %%
+# %% {"tags": []}
 import itertools
 import mizani
 
@@ -524,7 +524,7 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
 # %% [markdown]
 # ### scatter plot
 
-# %%
+# %% {"tags": []}
 import itertools
 
 # list(itertools.combinations(keys, 2))
@@ -591,7 +591,7 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
 # %% [markdown]
 # ### bar plot absolute r²
 
-# %%
+# %% {"tags": []}
 import itertools
 
 # list(itertools.combinations(keys, 2))
@@ -684,7 +684,7 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
 #
 # # crop_pvalue = 10 ** -10
 
-# %%
+# %% {"tags": []}
 plot_df = quantiles_pd_df
 plot_df = plot_df.astype({
     "prediction_quantile": "str",
@@ -695,17 +695,17 @@ plot_df = plot_df.assign(**{
     "proportional_difference_to_restricted_model": (plot_df["full_model"] / plot_df["total"]) - (plot_df["restricted_model"] / plot_df["total"]),
 })
 
-# %%
+# %% {"tags": []}
 plot_df.columns
 
-# %%
+# %% {"tags": []}
 grouping = ['measurement_quantile', 'prediction_quantile', 'phenotype_col', 'feature_set', 'covariates', 'bound', 'total']
 keys = plot_df["feature_set"].unique().tolist()
 
 unstacked_plot_df = plot_df.set_index(grouping)['full_model'].unstack("feature_set").reset_index(level="total")
 unstacked_plot_df
 
-# %%
+# %% {"tags": []}
 import itertools
 
 # list(itertools.combinations(keys, 2))
@@ -779,7 +779,7 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
     pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 
 
-# %%
+# %% {"tags": []}
 import itertools
 
 # list(itertools.combinations(keys, 2))
@@ -860,11 +860,11 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
     pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 
 
-# %%
+# %% {"tags": []}
 snakemake.output
 
-# %% [markdown]
-# ## JL plot
+# %% [markdown] {"tags": []}
+# # JL plot
 
 # %% {"tags": []}
 pandas_df = predictions_df.toPandas()
@@ -879,6 +879,9 @@ pandas_df[f"full_model_reduces_error"] = pandas_df["delta_abs_err"] < ((-1) * pa
 pandas_df[f"full_model_increases_error"] = pandas_df["delta_abs_err"] > pandas_df["distance_to_PRS"]
 pandas_df["full_model_improvement"] = pandas_df.apply(lambda r: "reduce" if r["full_model_reduces_error"] else ("increase" if r["full_model_increases_error"] else "none"), axis=1)
 pandas_df["full_model_improvement_rank"] = pandas_df.groupby(["phenotype_col", "feature_set"])["delta_abs_err"].rank(method="first", ascending=True)
+
+# %% {"tags": []}
+pandas_df
 
 
 # %% {"tags": []}
@@ -919,52 +922,71 @@ improvements_df = pandas_df.groupby(["phenotype_col", "feature_set", "full_model
 # )
 # display(plot)
 
+# %% [markdown]
+# ## num_individuals with changed absolute error
+
 # %% {"tags": []}
 plot = (
-        pn.ggplot(improvements_df.query("full_model_improvement!='none' and phenotype_col != 'Basophill_count' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").pivot(index=["phenotype_col", "full_model_improvement"], columns="feature_set", values='individuals').reset_index().fillna(0), pn.aes(x="LOFTEE_pLoF", y="AbExp_all_tissues", fill="phenotype_col"))
-        + pn.geom_point(size=3)
-        + pn.facet_wrap("full_model_improvement")
-        + pn.geom_abline(slope=1, color="black", linetype="dashed")
-        + pn.ggtitle(f"Number of individuals where the absolute error compared\n to common PRS changes by more than {distance_std} standard deviation(s)")
-        + pn.theme(
-            figure_size=(6, 4),
-        )
+    pn.ggplot(improvements_df.query("full_model_improvement!='none' and phenotype_col != 'Basophill_count' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").pivot(index=["phenotype_col", "full_model_improvement"], columns="feature_set", values='individuals').reset_index().fillna(0), pn.aes(x="LOFTEE_pLoF", y="AbExp_all_tissues", fill="phenotype_col"))
+    + pn.geom_point(size=3)
+    + pn.facet_wrap("full_model_improvement")
+    + pn.geom_abline(slope=1, color="black", linetype="dashed")
+    + pn.ggtitle(f"Number of individuals where the absolute error compared\n to common PRS changes by more than {distance_std} standard deviation(s)")
+    + pn.theme(
+        figure_size=(6, 4),
+    )
 )
 display(plot)
 
 # %% {"tags": []}
-plot1 = (
+path = snakemake.params["output_basedir"] + f"/num_individuals_with_changed_abserr.scatter"
+pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+improvements_df.to_parquet(path + ".parquet", index=False)
+
+# %% {"tags": []}
+plot = (
     pn.ggplot(updates_df, pn.aes(y="individuals", x="feature_set", fill="full_model_improvement"))
     + pn.ggtitle(f"Number of individuals where prediction differs by more than {distance_std} standard deviation(s) from common PRS")
     + pn.geom_bar(stat="identity")
     + pn.facet_wrap("phenotype_col", scales="free_y")
     + pn.theme(
-            figure_size=(20, 10),
-            subplots_adjust={'wspace': 0.25},
-            axis_text_x=pn.element_text(
-                rotation=30,
-                # hjust=1
-            ),
+        figure_size=(20, 10),
+        subplots_adjust={'wspace': 0.25},
+        axis_text_x=pn.element_text(
+            rotation=30,
+            # hjust=1
+        ),
     )
 )
-display(plot1)
+display(plot)
 
 # %% {"tags": []}
+path = snakemake.params["output_basedir"] + f"/num_individuals_with_changed_abserr.barplot"
+pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+updates_df.to_parquet(path + ".parquet", index=False)
 
 # %% {"tags": []}
 plot_df = updates_df.query("phenotype_col != 'Basophill_count' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").pivot(index=["phenotype_col", "full_model_improvement"], columns="feature_set", values='individuals').reset_index().fillna(0)
 plot_df = plot_df.groupby("phenotype_col")[["AbExp_all_tissues","LOFTEE_pLoF"]].sum().reset_index()
 plot = (
-        pn.ggplot(plot_df, pn.aes(x="LOFTEE_pLoF", y="AbExp_all_tissues", fill="phenotype_col"))
-        + pn.geom_point(size=3)
-        #+ pn.facet_wrap("full_model_improvement")
-        + pn.geom_abline(slope=1, color="black", linetype="dashed")
-        + pn.ggtitle(f"Number of individuals where prediction differs by \nmore than {distance_std} standard deviation(s) from common PRS")
-        + pn.theme(
-            figure_size=(6, 4),
-        )
+    pn.ggplot(plot_df, pn.aes(x="LOFTEE_pLoF", y="AbExp_all_tissues", fill="phenotype_col"))
+    + pn.geom_point(size=3)
+    #+ pn.facet_wrap("full_model_improvement")
+    + pn.geom_abline(slope=1, color="black", linetype="dashed")
+    + pn.ggtitle(f"Number of individuals where prediction differs by \nmore than {distance_std} standard deviation(s) from common PRS")
+    + pn.theme(
+        figure_size=(6, 4),
+    )
 )
 display(plot)
+
+# %% {"tags": []}
+path = snakemake.params["output_basedir"] + f"/num_individuals_with_changed_abserr.barplot"
+pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+plot_df.to_parquet(path + ".parquet", index=False)
 
 # %% {"tags": []}
 errors_df = pandas_df.query("updated == True and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").groupby(["phenotype_col" ,"feature_set"])["delta_abs_err"].median().reset_index().pivot(index="phenotype_col", columns="feature_set", values='delta_abs_err').reset_index()
@@ -980,28 +1002,49 @@ plot = (
 )
 display(plot)
 
-# %%
+# %% {"tags": []}
+path = snakemake.params["output_basedir"] + f"/median_changed_abserr.scatter"
+pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+errors_df.to_parquet(path + ".parquet", index=False)
 
 # %% {"tags": []}
+plot_df = pandas_df.query("updated == True and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])")
 plot = (
-        pn.ggplot(
-            pandas_df.query("updated == True and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])"), 
-            pn.aes(x="reorder(phenotype_col, -delta_abs_err)", y="delta_abs_err", fill="feature_set")
-        )
-        + pn.geom_boxplot(position=pn.positions.position_dodge(preserve="single"))
-        + pn.ggtitle(f"Change in absolut error where prediction differs by more than {distance_std} standard deviation(s) from common PRS")
-        + pn.theme(figure_size=(6, 8))
-        #+ pn.scale_x_discrete(limits=sorted(pandas_df["phenotype_col"].unique().tolist(), reverse=True, key=str.casefold))
-        + pn.coord_flip()
+    pn.ggplot(
+        plot_df, 
+        pn.aes(x="reorder(phenotype_col, -delta_abs_err)", y="delta_abs_err", fill="feature_set")
+    )
+    + pn.geom_boxplot(position=pn.positions.position_dodge(preserve="single"))
+    + pn.ggtitle(f"Change in absolut error where prediction differs by more than {distance_std} standard deviation(s) from common PRS")
+    + pn.theme(figure_size=(6, 8))
+    #+ pn.scale_x_discrete(limits=sorted(pandas_df["phenotype_col"].unique().tolist(), reverse=True, key=str.casefold))
+    + pn.coord_flip()
 )
 display(plot)
 
-# %%
-pandas_df["samples_in_extreme_percentiles"] = pandas_df.sort_values(["phenotype_col", "feature_set", "full_model_improvement_rank"]).groupby(["phenotype_col", "feature_set"])["is_extreme"].cumsum()
+# %% {"tags": []}
+path = snakemake.params["output_basedir"] + f"/change_in_abserr.boxplot"
+pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+plot_df.to_parquet(path + ".parquet", index=False)
 
 # %% {"tags": []}
+plot_df = pandas_df
+plot_df = (
+    plot_df
+    .assign(**{
+        "samples_in_extreme_percentiles": (
+            pandas_df
+            .sort_values(["phenotype_col", "feature_set", "full_model_improvement_rank"])
+            .groupby(["phenotype_col", "feature_set"])["is_extreme"]
+            .cumsum()
+        )
+    })
+    .query("full_model_improvement_rank<1000 and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])")
+)
 plot = (
-    pn.ggplot(pandas_df.query("full_model_improvement_rank<1000 and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])"), pn.aes(x='full_model_improvement_rank', y='samples_in_extreme_percentiles', color='feature_set'))
+    pn.ggplot(plot_df, pn.aes(x='full_model_improvement_rank', y='samples_in_extreme_percentiles', color='feature_set'))
     + pn.geom_line() # line plot
     + pn.theme(figure_size=(20, 15), subplots_adjust={'wspace': 0.25})
     + pn.facet_wrap("phenotype_col", scales="free_y")
@@ -1009,43 +1052,81 @@ plot = (
 )
 display(plot)
 
-# %% [raw]
-# res = []
-# distance_std = [0.5, 1, 1.5, 2]
-# for distance in distance_std:
-#     print(distance)
-#     pandas_df = predictions_df.toPandas()
-#     distances_per_phenotype = pandas_df.groupby(["phenotype_col", "individual"]).first().groupby("phenotype_col").agg(distance_to_PRS=('restricted_model_pred', 'std'))* distance
-#     pandas_df = pd.merge(pandas_df, distances_per_phenotype, left_on="phenotype_col", right_index=True, how="left")
-#     pandas_df["full_model_update"] = np.abs((pandas_df["restricted_model_pred"] - pandas_df["full_model_pred"]))
-#     pandas_df["full_model_update_rank"] = pandas_df.groupby(["phenotype_col", "feature_set"])["full_model_update"].rank(method="first", ascending=False)
-#     pandas_df["updated"] = pandas_df["full_model_update"] > pandas_df["distance_to_PRS"]
-#     pandas_df["delta_abs_err"] = np.abs(pandas_df["measurement"]-pandas_df["full_model_pred"]) - np.abs(pandas_df["measurement"]-pandas_df["restricted_model_pred"])
-#     pandas_df[f"full_model_reduces_error"] = pandas_df["delta_abs_err"] < ((-1) * pandas_df["distance_to_PRS"])
-#     pandas_df[f"full_model_increases_error"] = pandas_df["delta_abs_err"] > pandas_df["distance_to_PRS"]
-#     pandas_df["full_model_improvement"] = pandas_df.apply(lambda r: "reduce" if r["full_model_reduces_error"] else ("increase" if r["full_model_increases_error"] else "none"), axis=1)
-#     pandas_df["full_model_improvement_rank"] = pandas_df.groupby(["phenotype_col", "feature_set"])["delta_abs_err"].rank(method="first", ascending=True)
-#     improvements_df = pandas_df.groupby(["phenotype_col", "feature_set", "full_model_improvement"]).size().unstack(fill_value=0).stack().reset_index().rename(columns={0 : "individuals"})
-#     improvements_df["sd_cutoff"] = distance
-#     res.append(improvements_df)
-# improvements_df = pd.concat(res)
+# %% {"tags": []}
+path = snakemake.params["output_basedir"] + f"/rank_improvements_in_error"
+pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+plot_df.to_parquet(path + ".parquet", index=False)
 
-# %% [raw] {"tags": []}
-# plot_df = improvements_df.query("full_model_improvement!='none' and phenotype_col != 'Basophill_count' and sd_cutoff!=0.5 and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").pivot(index=["phenotype_col", "feature_set", "sd_cutoff"], columns="full_model_improvement", values='individuals').reset_index().fillna(0)
-# plot = (
-#         pn.ggplot(plot_df, pn.aes(x="phenotype_col", fill = "feature_set", width=1))
-#         + pn.geom_col(pn.aes(y="-increase"),position=pn.positions.position_dodge(preserve='single'))
-#         + pn.geom_col(pn.aes(y="reduce"),position=pn.positions.position_dodge(preserve='single'))
-#         + pn.geom_hline(pn.aes(yintercept = 0))
-#         + pn.ggtitle(f"Number of individuals where the absolute error compared\n to common PRS changes by more than {distance_std} standard deviation(s)")
-#         + pn.theme(
-#             figure_size=(8, 8),
-#         )
-#         + pn.facet_wrap("sd_cutoff")
-#         + pn.scale_x_discrete(limits=plot_df.query("feature_set=='AbExp_all_tissues' and sd_cutoff==1").sort_values("reduce")["phenotype_col"].to_list())
-#         + pn.coord_flip()
-#         + pn.labs(y='<-increase | decrease->', x="phenotype_col")
-# )
-# display(plot)
+# %% {"tags": []}
+res = []
+distance_std = [0.25, 0.5, 0.75, 1.0, 1.5, 2]
+for distance in distance_std:
+    print(distance)
+    pandas_df = predictions_df.toPandas()
+    distances_per_phenotype = pandas_df.groupby(["phenotype_col", "individual"]).first().groupby("phenotype_col").agg(distance_to_PRS=('measurement', 'std')) * distance
+    pandas_df = pd.merge(pandas_df, distances_per_phenotype, left_on="phenotype_col", right_index=True, how="left")
+    pandas_df["full_model_update"] = np.abs((pandas_df["restricted_model_pred"] - pandas_df["full_model_pred"]))
+    pandas_df["full_model_update_rank"] = pandas_df.groupby(["phenotype_col", "feature_set"])["full_model_update"].rank(method="first", ascending=False)
+    pandas_df["updated"] = pandas_df["full_model_update"] > pandas_df["distance_to_PRS"]
+    pandas_df["delta_abs_err"] = np.abs(pandas_df["measurement"]-pandas_df["full_model_pred"]) - np.abs(pandas_df["measurement"]-pandas_df["restricted_model_pred"])
+    pandas_df[f"full_model_reduces_error"] = pandas_df["delta_abs_err"] < ((-1) * pandas_df["distance_to_PRS"])
+    pandas_df[f"full_model_increases_error"] = pandas_df["delta_abs_err"] > pandas_df["distance_to_PRS"]
+    pandas_df["full_model_improvement"] = np.where(
+        pandas_df["full_model_reduces_error"],
+        "reduce",
+        np.where(
+            pandas_df["full_model_increases_error"],
+            "increase",
+            "none"
+        )
+    )
+    pandas_df["full_model_improvement_rank"] = pandas_df.groupby(["phenotype_col", "feature_set"])["delta_abs_err"].rank(method="first", ascending=True)
+    improvements_df = pandas_df.groupby(["phenotype_col", "feature_set", "full_model_improvement"]).size().unstack(fill_value=0).stack().reset_index().rename(columns={0 : "individuals"})
+    improvements_df["sd_cutoff"] = distance
+    res.append(improvements_df)
+improvements_df = pd.concat(res)
+
+# %% {"tags": []}
+plot_df = (
+    improvements_df.query("full_model_improvement != 'none' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])")
+    .pivot(index=["phenotype_col", "feature_set", "sd_cutoff"], columns="full_model_improvement", values='individuals')
+    .reset_index()
+    .fillna(0)
+)
+plot_df = plot_df.assign(sd_cutoff_label = plot_df["sd_cutoff"].astype("string") + " SD")
+plot_df = plot_df.assign(**{
+    "sd_cutoff_label": plot_df["sd_cutoff"].astype("string") + " SD",
+    "phenotype_col": plot_df["phenotype_col"].str.replace("_", " "),
+})
+
+# %% {"tags": []}
+plot_df
+
+# %% {"tags": []}
+plot = (
+    pn.ggplot(plot_df, pn.aes(x="reorder(phenotype_col, reduce)", fill = "feature_set", width=.8))
+    + pn.geom_col(pn.aes(y="-increase"), position=pn.positions.position_dodge(width=0.8, preserve='single'), alpha=0.8)
+    + pn.geom_col(pn.aes(y="reduce"), position=pn.positions.position_dodge(width=0.8, preserve='single'))
+    # + pn.geom_col(pn.aes(y="-increase"), position=pn.positions.position_dodge(preserve='single'), alpha=0.5)
+    # + pn.geom_col(pn.aes(y="reduce"), position=pn.positions.position_dodge(preserve='single'))
+    + pn.geom_hline(pn.aes(yintercept = 0))
+    + pn.ggtitle(f"Number of individuals where the absolute error compared\n to the common-variant model changes by more than {plot_df['sd_cutoff'].unique().tolist()} standard deviation(s)")
+    + pn.theme(
+        figure_size=(8, 16),
+    )
+    + pn.facet_wrap("sd_cutoff_label", scales="free_x")
+    + pn.scale_x_discrete(limits=plot_df.query("feature_set=='AbExp_all_tissues' and sd_cutoff==1").sort_values("reduce")["phenotype_col"].to_list())
+    # + pn.scale_fill_manual(["red", "blue"],breaks=reversed(["LOFTEE_pLoF", "AbExp_all_tissues"]))
+    + pn.coord_flip()
+    + pn.labs(y='Nr. of individuals with:\n◀---- increased prediction error ---- ┃ ---- reduced prediction error ----▶', x="phenotype")
+)
+display(plot)
+
+# %% {"tags": []}
+path = snakemake.params["output_basedir"] + f"/num_individuals_with_changed_abserr.diverging_barplot"
+pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+plot_df.to_parquet(path + ".parquet", index=False)
 
 # %%

@@ -17,6 +17,8 @@ smkpaths = [
     f"{SNAKEFILE_DIR}/feature_sets/__init__.smk",
     # run association tests
     f"{SNAKEFILE_DIR}/associate/__init__.smk",
+    # load the paper figure rule last
+    f"{SNAKEFILE_DIR}/compose_paper_figure.R.smk"
 ]
 
 for p in smkpaths:

@@ -4,7 +4,6 @@ SNAKEFILE_DIR = os.path.dirname(SNAKEFILE)
 SCRIPT=os.path.basename(SNAKEFILE)[:-4]
 
 
-# OUTPUT_BASEPATH=f'''{config["trait_association_comparison"]}/cov={{covariates}}/fset={{feature_set}}'''
 OUTPUT_BASEPATH=f'''{config["trait_association_comparison"]}/comp={{comparison}}'''
 YAML_PATH=f"""{SNAKEFILE_DIR}/compare_associations@{{comparison}}.yaml"""
 

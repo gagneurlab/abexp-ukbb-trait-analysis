@@ -45,7 +45,7 @@ from snakemk_util import pretty_print_snakemake
 # %% {"tags": []}
 #snakemake.reload()
 
-# %%
+# %% {"tags": []}
 # %matplotlib inline
 # %config InlineBackend.figure_format='retina'
 
@@ -86,10 +86,10 @@ except NameError:
         }
     )
 
-# %%
+# %% {"tags": []}
 print(pretty_print_snakemake(snakemake))
 
-# %%
+# %% {"tags": []}
 if "plot_dpi" in snakemake.params:
     DPI = snakemake.params["plot_dpi"]
 else:
@@ -108,7 +108,7 @@ else:
 # %% [raw]
 # print(json.dumps(config, indent=2, default=str))
 
-# %%
+# %% {"tags": []}
 phenotype_col = snakemake.wildcards["phenotype_col"]
 phenotype_col
 
@@ -119,22 +119,28 @@ phenotype_col
 # %% [markdown]
 # ## Read Predictions
 
-# %%
+# %% {"tags": []}
 pred_df = pd.read_parquet(snakemake.input["predictions_pq"])
 pred_df
 
-# %%
+# %% {"tags": []}
 full_model_r2 = sklearn.metrics.r2_score(pred_df["measurement"], pred_df["full_model_pred"])
 restricted_model_r2 = sklearn.metrics.r2_score(pred_df["measurement"], pred_df["restricted_model_pred"])
 basic_model_r2 = sklearn.metrics.r2_score(pred_df["measurement"], pred_df["basic_model_pred"])
 
-restricted_model_mean = pred_df["restricted_model_pred"].mean()
-restricted_model_std = pred_df["restricted_model_pred"].std()
+# restricted_model_mean = pred_df["restricted_model_pred"].mean()
+measurement_std = pred_df["measurement"].std()
 
 pehnotype_mean = pred_df["measurement"].mean()
 phenotype_std = pred_df["measurement"].std()
 
-# %%
+# %% {"tags": []}
+measurement_std
+
+# %% {"tags": []}
+pred_df["measurement"].hist(bins=100)
+
+# %% {"tags": []}
 nr_of_quantiles = 10
 
 pred_df = (
@@ -149,7 +155,7 @@ pred_df = (
     })
 )
 
-# %%
+# %% {"tags": []}
 pred_df = (
     pred_df
     .assign(**{
@@ -171,7 +177,7 @@ pred_df
 # %% [markdown]
 # ## Read PRC
 
-# %%
+# %% {"tags": []}
 # Read prc 
 prc_baseline_df = pd.read_parquet(snakemake.input["precision_recall_baseline_pq"])
 prc_full_df = pd.read_parquet(snakemake.input["precision_recall_full_pq"])
@@ -184,7 +190,10 @@ prc_df = pd.concat([prc_baseline_df, prc_full_df])
 # %% [markdown] {"tags": []}
 # ### Scatter Predictions
 
-# %%
+# %% {"tags": []}
+plot_df["full_model_new_risk"].sum()
+
+# %% {"tags": []}
 plot_df = pred_df[["phenotype_col", "measurement", "basic_model_pred", "restricted_model_pred", "full_model_pred", "full_model_new_risk"]].rename(columns={
     "restricted_model_pred": f"Age+Sex+PC+PRS \n r²={restricted_model_r2:.3f}" ,"full_model_pred": f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']} \n r²={full_model_r2:.3f}", "basic_model_pred": f"Age+Sex+PC \n r²={basic_model_r2:.3f}"
 })
@@ -214,7 +223,7 @@ pn.ggsave(plot, path + ".pdf", dpi=DPI)
 plot_df.to_parquet(path + ".parquet", index=False)
 display(plot)
 
-# %%
+# %% {"tags": []}
 plot_df = pred_df[["full_model_pred", "restricted_model_pred", "full_model_new_risk"]].rename(columns = {"full_model_pred": f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}", "restricted_model_pred": "Age+Sex+PC+PRS"})
 
 plot = (

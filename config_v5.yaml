@@ -25,6 +25,7 @@ genebass_bonferroni_cutoff: 0.01
 # config_dir will be copied to output_basedir
 config_dir: "config/ukbb_wes_200k"
 output_basedir: "/s/project/rep/processed/trait_associations_v5/ukbb_wes_200k"
+paper_figure: "/s/project/rep/processed/trait_associations_v5/ukbb_wes_200k/paper_figure"
 
 trait_associations: "/s/project/rep/processed/trait_associations_v5/ukbb_wes_200k/associate/{phenotype_col}"
 trait_association_comparison: "/s/project/rep/processed/trait_associations_v5/ukbb_wes_200k/compare_associations"

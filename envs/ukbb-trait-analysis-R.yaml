@@ -2,7 +2,6 @@ name: ukbb-trait-analysis-R
 
 channels:
   - conda-forge
-  - bioconda
 
 dependencies:
   - r-arrow
@@ -14,3 +13,9 @@ dependencies:
   - r-ggplot2
   - r-hms
   - r-xml
+  - r-ggrepel
+  - r-ggthemes
+  - r-cowplot
+  - r-patchwork
+  - r-ggtext
+  - r-cairo
