@@ -27,9 +27,14 @@ def _compare_associations_input_fn(wildcards, yaml_path=YAML_PATH):
             )
             for k, v in rules.associate__regression.output.items()
         },
-        "genebass_done": expand(
+        "compare_monti_pq": expand(
+            rules.associate__compare_monti.output["compare_monti_pq"],
+            phenotype_col=config["phenotypes"], 
+            feature_set=config["features_sets"],
+            covariates=config["covariates"],
+        ),
+        "compare_genebass_done": expand(
             rules.associate__regression.output["touch_file"],
-            # feature_set_basepath + '/config.yaml',
             phenotype_col=config["phenotypes"], 
             feature_set=config["features_sets"],
             covariates=config["covariates"],

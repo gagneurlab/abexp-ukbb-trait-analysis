@@ -48,12 +48,13 @@ rule compose_paper_figure:
         output_basedir=OUTPUT_BASEPATH,
     wildcard_constraints:
         covariates="[^/]+",
+    conda: f'{CONDA_ENV_YAML_DIR}/ukbb-trait-analysis-R.yaml'
 #     log:
 #         notebook=f"{DS_DIR}/{SCRIPT}.ipynb"
 #     notebook:
 #         "{params.nb_script}.ipynb"
     script:
-        "{params.nb_script}.py"
+        "{params.nb_script}.R"
 
 
 del OUTPUT_BASEPATH

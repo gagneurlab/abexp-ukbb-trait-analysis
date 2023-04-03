@@ -137,11 +137,13 @@ regression_results_df = (
         "term_pvals",
         "params",
     ])
-    .with_column(pl.min([
-        pl.col("lr_pval") * pl.count(),
-        1.0,
-    ]).alias("padj"))
-    .with_column((pl.col("rsquared") - pl.col("rsquared_restricted")).alias("rsquared_diff"))
+    .with_columns([
+        pl.min([
+            pl.col("lr_pval") * pl.count(),
+            1.0,
+        ]).alias("padj"),
+        (pl.col("rsquared") - pl.col("rsquared_restricted")).alias("rsquared_diff"),
+    ])
     .collect()
     # .to_pandas()
 )
@@ -185,7 +187,7 @@ genebass_300k_df = (
         "gene_id": "gene",
         "Pvalue": "lr_pval",
     })
-    .with_column(pl.min([
+    .with_columns(pl.min([
         pl.col("lr_pval") * pl.count(),
         1.0,
     ]).alias("padj"))
@@ -205,7 +207,7 @@ genebass_500k_df = (
         "gene_id": "gene",
         "Pvalue": "lr_pval",
     })
-    .with_column(pl.min([
+    .with_columns(pl.min([
         pl.col("lr_pval") * pl.count(),
         1.0,
     ]).alias("padj"))

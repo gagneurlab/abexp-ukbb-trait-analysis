@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -24,6 +24,8 @@ import pandas as pd
 
 import json
 import yaml
+
+import re
 
 import polars as pl
 
@@ -56,15 +58,16 @@ except NameError:
         rule_name = 'covariates',
         default_wildcards={
             # "phenotype_col": "Asthma",
-            "phenotype_col": "Lipoprotein_A",
+            # "phenotype_col": "Lipoprotein_A",
             # "phenotype_col": "Diabetes",
-            # "phenotype_col": "HDL_cholesterol",
+            "phenotype_col": "HDL_cholesterol",
             # "phenotype_col": "Triglycerides",
             # "phenotype_col": "standing_height",
             # "phenotype_col": "systolic_blood_pressure_f4080_0_0",
             # "covariates": "randomized_sex_age_genPC_CLMP_PRS",
             # "covariates": "randomizedOLS_sex_age_genPC_CLMP_PRS",
-            "covariates": "sex_age_genPC_CLMP_PRS",
+            # "covariates": "sex_age_genPC_CLMP_PRS",
+            "covariates": "sex_age_genPC_BMI_smoking_CLMP_PRS",
             # "covariates": "sex+age+genPC+CLMP",
             # "covariates": "sex_age_genPC",
         }
@@ -187,7 +190,7 @@ print(json.dumps(config, indent=2, default=str))
 with open(snakemake.output["covariates_config"], "w") as fd:
     yaml.dump(config, fd, sort_keys=False)
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # # Read metadata
 
 # %% [markdown]
@@ -201,15 +204,45 @@ phenotype_metadata_df
 # %%
 import patsy
 
-model_desc = patsy.ModelDesc.from_formula(restricted_formula)
+def get_variables_from_formula(formula, lhs=True, rhs=True):
+    if not isinstance(formula, patsy.ModelDesc):
+        model_desc = patsy.ModelDesc.from_formula(formula)
+    else:
+        model_desc = formula
 
-covariate_cols = list(dict.fromkeys(
-    [factor.name() for term in model_desc.rhs_termlist for factor in term.factors]
-))
+    covariate_cols = [
+        *([factor.name() for term in model_desc.lhs_termlist for factor in term.factors] if lhs else []),
+        *([factor.name() for term in model_desc.rhs_termlist for factor in term.factors] if rhs else []),
+    ]
+    
+    # find Q($i) -> $i
+    q_regex = re.compile(r"""Q\(['"](.*)['"]\)""")
+    
+    parsed_covariate_cols = []
+    for cov in covariate_cols:
+        q_matches = q_regex.findall(cov)
+        
+        if len(q_matches) > 0:
+            parsed_covariate_cols += q_matches
+        else:
+            parsed_covariate_cols.append(cov)
+
+    # deduplicate
+    parsed_covariate_cols = list(dict.fromkeys(parsed_covariate_cols))
+    
+    return parsed_covariate_cols
+
+
+# %%
+covariate_cols = get_variables_from_formula(restricted_formula, lhs=False)
 covariate_cols
 
 # %%
-meta_cols = [c for c in covariate_cols if c not in prs_score_mapping["pgs_id"].to_list()]
+meta_cols = [
+    c for c in covariate_cols 
+    if c not in prs_score_mapping["pgs_id"].to_list() 
+    and c not in config.get("register_phenotypes", [])
+]
 phenotype_metadata_subset = phenotype_metadata_df.set_index("col.name").loc[[
     # phenotype_col,
     *meta_cols,
@@ -232,7 +265,7 @@ phenotype_metadata_subset.reset_index().to_csv(snakemake.output["metadata_tsv"],
 samples_df = pl.read_parquet(snakemake.input["samples_pq"]).sort("individual")
 samples_df
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # ## phenotypes
 
 # %%
@@ -241,6 +274,12 @@ phenotype_df.schema
 
 # %%
 data_dfs = [phenotype_df]
+
+for data_path in snakemake.input["register_phenotypes"]:
+    data_df = pl.scan_parquet(data_path)
+    print(data_df.schema)
+    data_dfs.append(data_df)
+
 for data_path, group_df in phenotype_metadata_subset.groupby("data_path"):
     data_df = (
         pl.scan_parquet(data_path)
@@ -268,26 +307,26 @@ data_df = data_df.rename({"eid": "individual"})
 
 # %%
 # make sure that sample_id is a string
-data_df = data_df.with_column(pl.col("individual").cast(pl.Utf8).alias("individual"))
+data_df = data_df.with_columns(pl.col("individual").cast(pl.Utf8).alias("individual"))
 
 # %%
 # shuffle phenotype column if requested
 if config["randomize_phenotype"]:
     print("shuffling phenotype...")
-    data_df = data_df.with_column(pl.col(phenotype_col).shuffle(seed=42).alias(phenotype_col))
+    data_df = data_df.with_columns(pl.col(phenotype_col).shuffle(seed=42).alias(phenotype_col))
 
 # %%
 # shuffle phenotype column if requested
 if config["force_quantitative_regression"]:
     print("forcing quantitative phenotype...")
-    data_df = data_df.with_column(pl.col(phenotype_col).cast(pl.Float32()).alias(phenotype_col))
+    data_df = data_df.with_columns(pl.col(phenotype_col).cast(pl.Float32()).alias(phenotype_col))
 
 # %%
 # change order of columns
 data_df = data_df.select([
     "individual",
     snakemake.wildcards["phenotype_col"],
-    *phenotype_metadata_subset.index
+    *[c for c in covariate_cols if c in data_df]
 ])
 
 # %%
@@ -333,7 +372,7 @@ data_df = data_df.collect()
 # %%
 data_df = data_df.lazy()
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # ## clumping
 
 # %% [markdown]
@@ -342,11 +381,11 @@ data_df = data_df.lazy()
 # %%
 mac_index_variants_path
 
-# %% {"tags": []}
+# %%
 mac_index_vars = (
     pl.scan_parquet(mac_index_variants_path)
     .rename({"IID": "individual"})
-    .with_column(pl.col("individual").str.extract("([^_]+).*", 1))
+    .with_columns(pl.col("individual").str.extract("([^_]+).*", 1))
 )
 mac_index_vars.schema
 
@@ -395,7 +434,7 @@ mac_index_vars = (
     ])
 ).collect().lazy()
 
-# %% {"tags": []}
+# %%
 import pyranges as pr
 
 # %%
@@ -446,7 +485,7 @@ for pgs_id, pgs_score_file_path in prs_score_mapping.select(["pgs_id", "pgs_scor
             "#IID": "individual",
             "SCORE1_AVG": pgs_id,
         })
-        .with_column(pl.col("individual").str.extract("([^_]+).*", 1))
+        .with_columns(pl.col("individual").str.extract("([^_]+).*", 1))
         .select([
             "individual",
             pgs_id,
@@ -464,7 +503,7 @@ pgs_df = functools.reduce(lambda df1, df2: df1.join(df2, on="individual", how="o
 # %% [markdown]
 # # join everything
 
-# %% {"tags": []}
+# %%
 covariates_df = (
     samples_df.lazy()
     .join(data_df, on="individual", how="left")
@@ -485,6 +524,7 @@ snakemake.output
     .write_parquet(
         snakemake.output["covariates_pq"],
         compression="snappy",
+        statistics=True,
         use_pyarrow=True,
     )
 )

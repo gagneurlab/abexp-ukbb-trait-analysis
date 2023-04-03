@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -58,7 +58,7 @@ setup_plot_style()
 # os.environ["RAY_ADDRESS"] = 'ray://192.168.16.28:10001'
 # os.environ["RAY_ADDRESS"]
 
-# %% {"tags": []}
+# %%
 from rep.notebook_init import init_spark
 spark = init_spark(enable_glow=False)
 
@@ -88,7 +88,7 @@ except NameError:
         }
     )
 
-# %% {"tags": []}
+# %%
 # uncomment this to reload the Snakemake object after editing the rule input/output/params
 # snakemake.reload()
 
@@ -102,7 +102,7 @@ if "plot_dpi" in snakemake.params:
 else:
     DPI=450
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # # Load configuration
 
 # %%
@@ -116,10 +116,10 @@ print(json.dumps(config, indent=2, default=str))
 pval_cutoff = config["pval_cutoff"]
 pval_cutoff
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # # Read features
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # ## read association results
 
 # %%
@@ -255,7 +255,141 @@ num_significant_associations.to_csv(f"{path}.csv", index=False)
 num_significant_associations.to_parquet(f"{path}.parquet", index=False)
 
 # %% [markdown]
+# ### monti
+
+# %%
+compare_monti_df = (
+    spark.read.parquet(*snakemake.input["compare_monti_pq"])
+    .select([
+        # f.input_file_name(),
+        "phenotype_col",
+        "covariates",
+        "score_type",
+        "gene",
+        "genebass_500k_significant",
+        "padj",
+        "rank",
+        "n_true",
+    ])
+    .distinct()
+    .persist()
+)
+compare_monti_df.printSchema()
+
+# %%
+compare_monti_df.count()
+
+# %%
+score_types_df = (
+    compare_monti_df
+    .select(
+        "phenotype_col",
+        "covariates",
+        "score_type",
+    )
+    .distinct()
+    .groupby(
+        "phenotype_col",
+        "covariates",
+    )
+    .agg(f.collect_set("score_type").alias("score_types"))
+)
+score_types_df.printSchema()
+
+# %% [markdown]
 # ## Plot
+
+# %% [markdown]
+# ### monti per-trait
+
+# %%
+from pyspark.sql import Window
+w = Window.partitionBy(
+    "phenotype_col",
+    "covariates",
+    "score_type",
+    "significant",
+)
+
+plot_df = (
+    score_types_df
+    .filter(f.array_contains(f.col("score_types"), f.lit("Monti")))
+    .select(
+        "phenotype_col",
+        "covariates",
+    )
+    .join(compare_monti_df, on=["phenotype_col", "covariates",], how="left")
+    .withColumn("significant", f.col("padj") < 0.05)
+    .withColumn('least_still_significant', (f.max('rank').over(w) == f.col('rank')) & f.col("significant"))
+    # .filter(f.col("phenotype_col") == f.lit("HDL_cholesterol"))
+    .toPandas()
+)
+plot_df
+
+# %%
+plot = (
+    pn.ggplot(plot_df.query("rank <= 200"), pn.aes(
+        x="rank",
+        y="n_true",
+        color="score_type"
+    ))
+    + pn.geom_step()
+    + pn.geom_step(plot_df.query("significant"), size=2)
+    + pn.geom_point(plot_df.query("least_still_significant"))
+    + pn.facet_wrap("phenotype_col", scales="free_y")
+    + pn.theme(
+        figure_size=(16, 16)
+    )
+)
+plot
+
+# %% [markdown]
+# ### monti aggregated
+
+# %%
+from pyspark.sql import Window
+
+plot_df = (
+    score_types_df
+    .filter(f.array_contains(f.col("score_types"), f.lit("Monti")))
+    .select(
+        "phenotype_col",
+        "covariates",
+    )
+    .join(compare_monti_df, on=["phenotype_col", "covariates",], how="left")
+    .withColumn("rank", f.rank().over(Window.partitionBy("score_type").orderBy("padj")))
+    .withColumn("n_true", f.sum(f.col("genebass_500k_significant").cast(t.LongType())).over(
+        Window.partitionBy("score_type").orderBy("padj").rowsBetween(Window.unboundedPreceding, 0)
+    ))
+    .withColumn("significant", f.col("padj") < 0.05)
+    .withColumn(
+        'least_still_significant',
+        (f.max('rank').over(Window.partitionBy("score_type", "significant")) == f.col('rank')) & f.col("significant")
+    )
+    .sort("rank")
+    # .filter(f.col("phenotype_col") == f.lit("HDL_cholesterol"))
+    .toPandas()
+)
+plot_df
+
+# %%
+plot_df.query("least_still_significant")
+
+# %%
+plot = (
+    pn.ggplot(plot_df, pn.aes(
+        x="rank",
+        y="n_true",
+        color="score_type"
+    ))
+    + pn.geom_step()
+    + pn.geom_step(plot_df.query("significant"), size=2)
+    + pn.geom_point(plot_df.query("least_still_significant"))
+    + pn.theme(
+        figure_size=(16, 16)
+    )
+)
+plot
 
 # %%
 feature_set_idx = pd.DataFrame({"feature_set": config["features_sets"][::-1]}).reset_index()
@@ -337,7 +471,7 @@ import itertools
 
 keys = adj_regression_results_pd_df["feature_set"].unique().tolist()
 
-# %% {"tags": []}
+# %%
 keys
 
 # %%
@@ -386,7 +520,7 @@ plot_df = plot_df.assign(
 )
 plot_df
 
-# %% {"tags": []}
+# %%
 path=snakemake.params["output_basedir"] + "/num_significants.scatter_plot"
 plot_df.to_parquet(path + ".parquet", index=False)
 plot_df.to_csv(path + ".csv", index=False)

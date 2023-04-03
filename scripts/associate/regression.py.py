@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -55,7 +55,7 @@ import matplotlib.pyplot as plt
 # os.environ["RAY_ADDRESS"] = 'ray://192.168.16.28:10001'
 # os.environ["RAY_ADDRESS"]
 
-# %% [raw] {"tags": []}
+# %% [raw]
 #
 
 # %%
@@ -63,7 +63,7 @@ import matplotlib.pyplot as plt
 # use_ray = True
 use_ray = False
 
-# %% {"tags": []}
+# %%
 ray = None
 ray_context = None
 if use_ray:
@@ -111,7 +111,7 @@ except NameError:
         rule_name = 'associate__regression',
         default_wildcards={
             # "phenotype_col": "CAD_SOFT",
-            "phenotype_col": "c_reactive_protein",
+            # "phenotype_col": "c_reactive_protein",
             # "phenotype_col": "severe_LDL",
             # "phenotype_col": "Asthma",
             # "phenotype_col": "Triglycerides",
@@ -121,13 +121,15 @@ except NameError:
             # "phenotype_col": "standing_height_f50_0_0",
             # "phenotype_col": "body_mass_index_bmi_f21001_0_0",
             # "phenotype_col": "systolic_blood_pressure_automated_reading_f4080_0_0",
-            # "phenotype_col": "hdl_cholesterol_f30760_0_0",
+            "phenotype_col": "HDL_cholesterol",
             # "feature_set": "LOFTEE_pLoF",
-            "feature_set": "max_AbExp",
+            # "feature_set": "max_AbExp",
             # "feature_set": "AbExp_all_tissues",
+            "feature_set": "AbExp_best_tissue",
             # "feature_set": "LOFTEE_pLoF",
             # "covariates": "randomized_sex_age_genPC_CLMP_PRS",
-            "covariates": "sex_age_genPC_CLMP_PRS",
+            "covariates": "sex_age_genPC_BMI_smoking_CLMP_PRS",
+            # "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex_age_genPC_CLMP",
             # "covariates": "sex_age_genPC",
         }
@@ -137,7 +139,7 @@ except NameError:
 from snakemk_util import pretty_print_snakemake
 print(pretty_print_snakemake(snakemake))
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # # Load configuration
 
 # %%
@@ -158,6 +160,11 @@ phenocode
 # %%
 restricted_formula = config["covariates"]["restricted_formula"]
 print(restricted_formula)
+
+# %%
+# Should we only keep the most associating variable?
+aggregate_variables = config.get("aggregate_variables", False)
+aggregate_variables
 
 # %% [markdown]
 # # Broadcast/deref function definitions
@@ -258,7 +265,10 @@ def deref(obj):
 # %%
 snakemake.input["covariates_pq"]
 
-# %% {"tags": []}
+# %%
+snakemake.input["train_test_split_pq"]
+
+# %%
 snakemake.input["train_test_split_pq"]
 
 # %%
@@ -274,7 +284,7 @@ covariates_df = (
 )
 # covariates_df.schema
 
-# %% {"tags": []}
+# %%
 covariates_df_columns = covariates_df.columns
 
 # %% [raw]
@@ -302,7 +312,7 @@ normalized_covariates_df = normalized_covariates_df.assign(**{
 # %%
 normalized_covariates_df
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # ## clumping
 
 # %%
@@ -323,7 +333,7 @@ def get_variants_by_gene(clumping_variants_df, gene_id):
 # get_variants_by_gene(clumping_variants_df, gene_id="ENSG00000084674")
 
 # %%
-def format_formula(formula, keys, add_clumping=True, clumping_variants_df=clumping_variants_df):
+def format_formula(formula, keys, add_clumping=True, clumping_variants_df=clumping_variants_df) -> patsy.ModelDesc:
     if not isinstance(formula, patsy.ModelDesc):
         model_desc = patsy.ModelDesc.from_formula(formula)
     else:
@@ -372,6 +382,8 @@ def format_formula(formula, keys, add_clumping=True, clumping_variants_df=clumpi
 # print(test_formula_2)
 
 # %%
+import patsy
+
 def get_variables_from_formula(formula, lhs=True, rhs=True):
     if not isinstance(formula, patsy.ModelDesc):
         model_desc = patsy.ModelDesc.from_formula(formula)
@@ -382,20 +394,29 @@ def get_variables_from_formula(formula, lhs=True, rhs=True):
         *([factor.name() for term in model_desc.lhs_termlist for factor in term.factors] if lhs else []),
         *([factor.name() for term in model_desc.rhs_termlist for factor in term.factors] if rhs else []),
     ]
+    
+    # find Q($i) -> $i
+    q_regex = re.compile(r"""Q\(['"](.*)['"]\)""")
+    
+    parsed_covariate_cols = []
+    for cov in covariate_cols:
+        q_matches = q_regex.findall(cov)
+        
+        if len(q_matches) > 0:
+            parsed_covariate_cols += q_matches
+        else:
+            parsed_covariate_cols.append(cov)
+
     # deduplicate
-    covariate_cols = list(dict.fromkeys(covariate_cols))
+    parsed_covariate_cols = list(dict.fromkeys(parsed_covariate_cols))
     
-    # replace Q($i) -> $i
-    regex = re.compile(r"""Q\(['"](.*)['"]\)""")
-    covariate_cols = [regex.sub(r"\1", c) for c in covariate_cols]
-    
-    return covariate_cols
+    return parsed_covariate_cols
 
 
 # %% [raw]
 # get_variables_from_formula(test_formula)
 
-# %% {"tags": []}
+# %%
 # broadcast_covariates_df = broadcast(covariates_df.to_arrow())
 broadcast_clumping_variants_df = broadcast(clumping_variants_df)
 
@@ -433,14 +454,14 @@ else:
 # pca = PCA(n_components = X_train_std.shape[1])
 # pca_data = pca.fit_transform(X_train_std)
 
-# %% {"tags": []}
+# %%
 # restricted_model = smf.logit(
 #     restricted_formula,
 #     data = data_df.to_pandas().astype({snakemake.wildcards["phenotype_col"]: "float32"})
 # ).fit()
 # # broadcast_restricted_model = spark.sparkContext.broadcast(restricted_model)
 
-# %% {"tags": []}
+# %%
 from scipy.stats.distributions import chi2
 from statsmodels.discrete.discrete_model import BinaryResultsWrapper
 import statsmodels.api as sm
@@ -483,7 +504,7 @@ def prsquared_adj(binary_model: BinaryResultsWrapper):
                 * (1 - binary_model.prsquared))
 
 
-# %% {"tags": []}
+# %%
 import warnings
 from copy import deepcopy
 from importlib.resources import open_text
@@ -1046,7 +1067,7 @@ def load_endometrial():
 
 
 
-# %% {"tags": []}
+# %%
 from statsmodels.regression.linear_model import (
     RegressionModel,
     RegressionResults,
@@ -1141,14 +1162,263 @@ def firth_regression(formula, data):
     return fl
 
 
-# %% {"tags": []}
+# %% [raw]
+# def _fit(
+#     formatted_restricted_formula,
+#     formatted_full_formula,
+#     data_df,
+#     boolean_regression: bool=False,
+#     enable_firth_regression=True,
+#     fitted_restricted_model=None,
+#     fitted_full_model=None,
+# ):
+#     if boolean_regression:
+#         if fitted_restricted_model is None:
+#             # fit restricted model
+#             restricted_model_converged = False
+#             restricted_model = firth_regression(
+#                 formatted_restricted_formula,
+#                 data = data_df
+#             )
+#             try:
+#                 restricted_model = restricted_model.fit()
+#                 restricted_model_converged = restricted_model.mle_retvals["converged"]
+#             except np.linalg.LinAlgError as e:
+#                 pass
+#         else:
+#             restricted_model = fitted_restricted_model
+#             restricted_model_converged = True
+#
+#         # fit full model
+#         full_model_converged = False
+#         full_model = firth_regression(
+#             formatted_full_formula,
+#             data = data_df
+#         )
+#         try:
+#             if fitted_full_model is None:
+#                 full_model = full_model.fit()
+#             else:
+#                 full_model = fitted_full_model
+#             full_model = full_model.fit()
+#             full_model_converged = full_model.mle_retvals["converged"]
+#         except np.linalg.LinAlgError as e:
+#             pass
+#
+# #             converged = False
+# #             try:
+# #                 restricted_model = smf.logit(
+# #                     formatted_restricted_formula,
+# #                     data = data_df
+# #                 ).fit(maxiter=200, disp=0, warn_convergence=False)
+#
+# #                 full_model = smf.logit(
+# #                     formatted_full_formula,
+# #                     data = data_df
+# #                 ).fit(maxiter=200, disp=0, warn_convergence=False)
+#
+# #                 converged = restricted_model.mle_retvals["converged"] & full_model.mle_retvals["converged"]
+# #             except np.linalg.LinAlgError as linalg_error:
+# #                 # newton failed
+# #                 pass
+#
+# #             if not converged:
+# #                 # retry with l-bfgs-b
+# #                 print("retry with l-bfgs-b")
+# #                 restricted_model = smf.logit(
+# #                     formatted_restricted_formula,
+# #                     data = data_df
+# #                 ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
+#
+# #                 full_model = smf.logit(
+# #                     formatted_full_formula,
+# #                     data = data_df
+# #                 ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
+#
+#
+#         # calculate statistics
+#         if restricted_model_converged and full_model_converged:
+#             lr_stat, lr_pval, lr_df_diff = lr_test(restricted_model, full_model)
+#         else:
+#             lr_stat = np.nan
+#             lr_pval = np.nan
+#             lr_df_diff = 0
+#
+#         if restricted_model_converged:
+#             rsquared_restricted = prsquared_adj(restricted_model)
+#             rsquared_restricted_raw = restricted_model.prsquared
+#             restricted_model_llf = restricted_model.llf
+#         else:
+#             rsquared_restricted = np.nan
+#             rsquared_restricted_raw = np.nan
+#             restricted_model_llf = np.nan
+#
+#         if full_model_converged:
+#             rsquared = prsquared_adj(full_model)
+#             rsquared_raw = full_model.prsquared
+#             full_model_llf = full_model.llf
+#             term_pvalues = full_model.pvalues.to_dict()
+#             full_model_params = full_model.params.to_dict()
+#         else:
+#             rsquared = np.nan
+#             rsquared_raw = np.nan
+#             full_model_llf = np.nan
+#             term_pvalues = {}
+#             full_model_params = {}
+#     else:
+#         # fit restricted model
+#         if fitted_restricted_model is None:
+#             restricted_model_converged = False
+#             restricted_model = smf.ols(
+#                 formatted_restricted_formula,
+#                 data = data_df
+#             )
+#             try:
+#                 restricted_model = restricted_model.fit()
+#                 restricted_model_converged = True
+#             except np.linalg.LinAlgError as e:
+#                 pass
+#         else:
+#             restricted_model = fitted_restricted_model
+#             restricted_model_converged = True
+#
+#         # fit full model
+#         full_model_converged = False
+#         full_model = smf.ols(
+#             formatted_full_formula,
+#             data = data_df
+#         )
+#         try:
+#             full_model = full_model.fit()
+#             full_model_converged = True
+#         except np.linalg.LinAlgError as e:
+#             pass
+#
+#         # calculate statistics
+#         if restricted_model_converged and full_model_converged:
+#             lr_stat, lr_pval, lr_df_diff = full_model.compare_lr_test(restricted_model)
+#         else:
+#             lr_stat = np.nan
+#             lr_pval = np.nan
+#             lr_df_diff = 0
+#
+#         if restricted_model_converged:
+#             rsquared_restricted = restricted_model.rsquared_adj
+#             rsquared_restricted_raw = restricted_model.rsquared
+#             restricted_model_llf = restricted_model.llf
+#         else:
+#             rsquared_restricted = np.nan
+#             rsquared_restricted_raw = np.nan
+#             restricted_model_llf = np.nan
+#
+#         if full_model_converged:
+#             rsquared = full_model.rsquared_adj
+#             rsquared_raw = full_model.rsquared
+#             full_model_llf = full_model.llf
+#             term_pvalues = full_model.pvalues.to_dict()
+#             full_model_params = full_model.params.to_dict()
+#         else:
+#             rsquared = np.nan
+#             rsquared_raw = np.nan
+#             full_model_llf = np.nan
+#             term_pvalues = {}
+#             full_model_params = {}
+
+# %%
+def fit(
+    formula,
+    data_df,
+    boolean_regression: bool=False,
+):
+    if boolean_regression:
+        model_converged = False
+        model = firth_regression(
+            formula,
+            data = data_df
+        )
+        try:
+            model = model.fit()
+            model_converged = model.mle_retvals["converged"]
+        except np.linalg.LinAlgError as e:
+            pass
+
+
+#         converged = False
+#         try:
+#             model = smf.logit(
+#                 formula,
+#                 data = data_df
+#             ).fit(maxiter=200, disp=0, warn_convergence=False)
+
+#             converged = model.mle_retvals["converged"]
+#         except np.linalg.LinAlgError as linalg_error:
+#             # newton failed
+#             pass
+
+#         if not converged:
+#             # retry with l-bfgs-b
+#             print("retry with l-bfgs-b")
+#             model = smf.logit(
+#                 formula,
+#                 data = data_df
+#             ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
+
+        if model_converged:
+            rsquared = prsquared_adj(model)
+            rsquared_raw = model.prsquared
+            llf = model.llf
+            term_pvalues = model.pvalues.to_dict()
+            params = model.params.to_dict()
+        else:
+            rsquared = np.nan
+            rsquared_raw = np.nan
+            llf = np.nan
+            term_pvalues = {}
+            params = {}
+    else:
+        # fit restricted model
+        model_converged = False
+        model = smf.ols(
+            formula,
+            data = data_df
+        )
+        try:
+            model = model.fit()
+            model_converged = True
+        except np.linalg.LinAlgError as e:
+            pass
+
+        if model_converged:
+            rsquared = model.rsquared_adj
+            rsquared_raw = model.rsquared
+            llf = model.llf
+            term_pvalues = model.pvalues.to_dict()
+            params = model.params.to_dict()
+        else:
+            rsquared = np.nan
+            rsquared_raw = np.nan
+            llf = np.nan
+            term_pvalues = {}
+            full_model_params = {}
+    
+    return model, {
+        "converged": model_converged,
+        "rsquared": rsquared,
+        "rsquared_raw": rsquared_raw,
+        "llf": llf,
+        "term_pvalues": term_pvalues,
+        "params": params,
+    }
+
+# %%
 import statsmodels.formula.api as smf
 import sklearn
+import patsy
 
 from threadpoolctl import threadpool_limits
 from typing import List, Union
 
-def fit(
+def test_association(
     pd_df,
     groupby_columns: List[str],
     full_formula: str,
@@ -1157,8 +1427,9 @@ def fit(
     clumping_variants_df: pd.DataFrame = None,
     add_clumping: bool = config["covariates"]["add_clumping"],
     boolean_regression: bool = is_boolean_dtype,
-    enable_firth_regression=True,
     normalize_features=True,
+    aggregate_variables=aggregate_variables,
+    return_models=False
 ):
     keys=pd_df.loc[:, groupby_columns].iloc[0].to_dict()
 
@@ -1174,23 +1445,38 @@ def fit(
         add_clumping=add_clumping,
         clumping_variants_df=clumping_variants_df,
     )
+    
+    missing_terms_in_full_formula = [c for c in formatted_restricted_formula.rhs_termlist if c not in formatted_full_formula.rhs_termlist]
+    assert len(missing_terms_in_full_formula) == 0, (
+        f"Restricted formula is not a subset of the full formula. Missing terms: '{missing_terms_in_full_formula}'"
+    )
 
     # get necessary columns
     restricted_variables = get_variables_from_formula(formatted_restricted_formula)
     full_variables = get_variables_from_formula(formatted_full_formula)
+    # the trait(s) which we want to associate:
     target_variables = get_variables_from_formula(formatted_restricted_formula, rhs=False)
     necessary_columns = {
         *restricted_variables,
         *full_variables,
         "individual",
     }
+    
+    tested_terms = [
+        c.name() for c in formatted_full_formula.rhs_termlist
+        if c not in set(formatted_restricted_formula.rhs_termlist)
+    ]
+    
+    assert len(tested_terms) > 0, (
+        "there are no tested variables! `full_formula` needs to be a superset of `restricted_formula`!"
+    )
 
     # subset to necessary columns
     covariates_df = covariates_df[
         [c for c in covariates_df_columns if c in necessary_columns]
     ]
 
-    # merge with phenotype df to make sure that we have all scores predicted
+    # merge with phenotype df to make sure that we have scores for all individuals with a measurement
     data_df = covariates_df.merge(pd_df, on=["individual"], how="left")
     # fill missing values
     data_df = data_df.fillna({
@@ -1209,145 +1495,60 @@ def fit(
     assert necessary_columns.issubset(data_df.columns), f"Missing columns in merged dataframe: '{necessary_columns.difference(data_df.columns)}'"
     
     try:
-        if boolean_regression:
-            # fit restricted model
-            restricted_model_converged = False
-            restricted_model = firth_regression(
-                formatted_restricted_formula,
-                data = data_df
+        # fit models
+        restricted_model, restricted_model_stats = fit(
+            formula=formatted_restricted_formula,
+            data_df=data_df,
+            boolean_regression=boolean_regression,
+        )
+        
+        full_model, full_model_stats = fit(
+            formula=formatted_full_formula,
+            data_df=data_df,
+            boolean_regression=boolean_regression,
+        )
+        
+        # get most associating variable
+        most_associating_term = pd.DataFrame({
+            "variable": tested_terms,
+            "pval": [full_model_stats["term_pvalues"][v] for v in tested_terms],
+            "param": [full_model_stats["params"][v] for v in tested_terms],
+        }).sort_values(['pval', 'param'], ascending=[True, False]).iloc[0].to_dict()
+        
+        if aggregate_variables and (len(tested_terms) > 0):
+            # re-fit full model with only the most associating variable
+            most_associating_term_formula = patsy.ModelDesc(
+                lhs_termlist=formatted_full_formula.lhs_termlist,
+                rhs_termlist=[
+                    t for t in formatted_full_formula.rhs_termlist if (
+                        t in set(formatted_restricted_formula.rhs_termlist)
+                    ) or (
+                        t.name() == most_associating_term["variable"]
+                    )
+                ]
             )
-            try:
-                restricted_model = restricted_model.fit()
-                restricted_model_converged = restricted_model.mle_retvals["converged"]
-            except np.linalg.LinAlgError as e:
-                pass
+            # most_associating_term_formula.rhs_termlist += [
+            #     patsy.Term([patsy.EvalFactor(f"""Q('{most_associating_term["variable"]}')""")])
+            # ]
 
-            # fit full model
-            full_model_converged = False
-            full_model = firth_regression(
-                formatted_full_formula,
-                data = data_df
+            full_model, full_model_stats = fit(
+                formula=most_associating_term_formula,
+                data_df=data_df,
+                boolean_regression=boolean_regression,
             )
-            try:
-                full_model = full_model.fit()
-                full_model_converged = full_model.mle_retvals["converged"]
-            except np.linalg.LinAlgError as e:
-                pass
 
-#             converged = False
-#             try:
-#                 restricted_model = smf.logit(
-#                     formatted_restricted_formula,
-#                     data = data_df
-#                 ).fit(maxiter=200, disp=0, warn_convergence=False)
-
-#                 full_model = smf.logit(
-#                     formatted_full_formula,
-#                     data = data_df
-#                 ).fit(maxiter=200, disp=0, warn_convergence=False)
-
-#                 converged = restricted_model.mle_retvals["converged"] & full_model.mle_retvals["converged"]
-#             except np.linalg.LinAlgError as linalg_error:
-#                 # newton failed
-#                 pass
-
-#             if not converged:
-#                 # retry with l-bfgs-b
-#                 print("retry with l-bfgs-b")
-#                 restricted_model = smf.logit(
-#                     formatted_restricted_formula,
-#                     data = data_df
-#                 ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
-
-#                 full_model = smf.logit(
-#                     formatted_full_formula,
-#                     data = data_df
-#                 ).fit(method="lbfgs", maxiter=1000, disp=0, warn_convergence=False)
-
-
+        if not restricted_model_stats["converged"] or not full_model_stats["converged"]:
+            lr_stat = np.nan
+            lr_pval = np.nan
+            lr_df_diff = 0
+        else:
             # calculate statistics
-            if restricted_model_converged and full_model_converged:
+            if boolean_regression:
                 lr_stat, lr_pval, lr_df_diff = lr_test(restricted_model, full_model)
             else:
-                lr_stat = np.nan
-                lr_pval = np.nan
-                lr_df_diff = 0
-            
-            if restricted_model_converged:
-                rsquared_restricted = prsquared_adj(restricted_model)
-                rsquared_restricted_raw = restricted_model.prsquared
-                restricted_model_llf = restricted_model.llf
-            else:
-                rsquared_restricted = np.nan
-                rsquared_restricted_raw = np.nan
-                restricted_model_llf = np.nan
-            
-            if full_model_converged:
-                rsquared = prsquared_adj(full_model)
-                rsquared_raw = full_model.prsquared
-                full_model_llf = full_model.llf
-                term_pvalues = full_model.pvalues.to_dict()
-                full_model_params = full_model.params.to_dict()
-            else:
-                rsquared = np.nan
-                rsquared_raw = np.nan
-                full_model_llf = np.nan
-                term_pvalues = {}
-                full_model_params = {}
-        else:
-            # fit restricted model
-            restricted_model_converged = False
-            restricted_model = smf.ols(
-                formatted_restricted_formula,
-                data = data_df
-            )
-            try:
-                restricted_model = restricted_model.fit()
-                restricted_model_converged = True
-            except np.linalg.LinAlgError as e:
-                pass
-
-            # fit full model
-            full_model_converged = False
-            full_model = smf.ols(
-                formatted_full_formula,
-                data = data_df
-            )
-            try:
-                full_model = full_model.fit()
-                full_model_converged = True
-            except np.linalg.LinAlgError as e:
-                pass
-
-            # calculate statistics
-            if restricted_model_converged and full_model_converged:
+                # use the statsmodels built-in likelihood ratio test
                 lr_stat, lr_pval, lr_df_diff = full_model.compare_lr_test(restricted_model)
-            else:
-                lr_stat = np.nan
-                lr_pval = np.nan
-                lr_df_diff = 0
-            
-            if restricted_model_converged:
-                rsquared_restricted = restricted_model.rsquared_adj
-                rsquared_restricted_raw = restricted_model.rsquared
-                restricted_model_llf = restricted_model.llf
-            else:
-                rsquared_restricted = np.nan
-                rsquared_restricted_raw = np.nan
-                restricted_model_llf = np.nan
-            
-            if full_model_converged:
-                rsquared = full_model.rsquared_adj
-                rsquared_raw = full_model.rsquared
-                full_model_llf = full_model.llf
-                term_pvalues = full_model.pvalues.to_dict()
-                full_model_params = full_model.params.to_dict()
-            else:
-                rsquared = np.nan
-                rsquared_raw = np.nan
-                full_model_llf = np.nan
-                term_pvalues = {}
-                full_model_params = {}
+    
 
     except Exception as e:
         print("---------------- error log -----------------")
@@ -1356,42 +1557,51 @@ def fit(
         print("-------------- error log end ---------------")
         raise e
 
-    return (
+    stats_df = (
         pd_df
         .loc[:, groupby_columns]
         .iloc[:1]
         .copy()
         .assign(**{
             "n_observations": [int(full_model.nobs)],
-            "term_pvals": [term_pvalues], 
-            "params": [full_model_params],
-            "restricted_model_converged": [restricted_model_converged],
-            "full_model_converged": [full_model_converged],
-            "restricted_model_llf": [restricted_model_llf],
-            "full_model_llf": [full_model_llf],
-            "rsquared_restricted": [rsquared_restricted],
-            "rsquared_restricted_raw": [rsquared_restricted_raw],
-            "rsquared": [rsquared],
-            "rsquared_raw": [rsquared_raw],
+            "term_pvals": [full_model_stats["term_pvalues"]], 
+            "params": [full_model_stats["params"]],
+            "restricted_model_converged": [restricted_model_stats["converged"]],
+            "full_model_converged": [full_model_stats["converged"]],
+            "restricted_model_llf": [restricted_model_stats["llf"]],
+            "full_model_llf": [full_model_stats["llf"]],
+            "rsquared_restricted": [restricted_model_stats["rsquared"]],
+            "rsquared_restricted_raw": [restricted_model_stats["rsquared_raw"]],
+            "rsquared": [full_model_stats["rsquared"]],
+            "rsquared_raw": [full_model_stats["rsquared_raw"]],
             "lr_stat": [lr_stat],
             "lr_pval": [lr_pval],
             "lr_df_diff": [lr_df_diff],
+            "most_associating_term": [most_associating_term["variable"]],
         })
     )
+    if return_models:
+        return stats_df, restricted_model, full_model
+    else:
+        return stats_df
 
 # %% [raw]
-# fit(
+# _test_term = f"I(Q('{phenotype_col}') ** 2)"
+# _test = test_association(
 #     pd_df=covariates_df.select("individual").collect().to_pandas().assign(gene="ENSG00000084674"),
 #     groupby_columns=["gene"],
-#     full_formula=restricted_formula,
+#     full_formula=f"{restricted_formula} + {_test_term}",
 #     restricted_formula=restricted_formula,
 #     # covariates_df=broadcast_covariates_df,
 #     covariates_df=normalized_covariates_df,
 #     clumping_variants_df=clumping_variants_df,
 # )
+# display(_test)
+# assert _test.iloc[0]["most_associating_term"] == _test_term
+# del _test, _test_term
 
 # %% [raw]
-# fit(
+# test_association(
 #     pd_df=covariates_df.select("individual").collect().to_pandas().assign(gene="ENSG00000084674"),
 #     groupby_columns=["gene"],
 #     restricted_formula='Asthma ~ 1\n + genetic_principal_components_f22009_0_1\n + genetic_principal_components_f22009_0_2\n + genetic_principal_components_f22009_0_3\n + genetic_principal_components_f22009_0_4\n + genetic_principal_components_f22009_0_5\n + genetic_principal_components_f22009_0_6\n + genetic_principal_components_f22009_0_7\n + genetic_principal_components_f22009_0_8\n + genetic_principal_components_f22009_0_9\n + genetic_principal_components_f22009_0_10\n + genetic_principal_components_f22009_0_11\n + genetic_principal_components_f22009_0_12\n + genetic_principal_components_f22009_0_13\n + genetic_principal_components_f22009_0_14\n + genetic_principal_components_f22009_0_15\n + genetic_principal_components_f22009_0_16\n + genetic_principal_components_f22009_0_17\n + genetic_principal_components_f22009_0_18\n + genetic_principal_components_f22009_0_19\n + genetic_principal_components_f22009_0_20\n + genetic_principal_components_f22009_0_21\n + genetic_principal_components_f22009_0_22\n + genetic_principal_components_f22009_0_23\n + genetic_principal_components_f22009_0_24\n + genetic_principal_components_f22009_0_25\n + genetic_principal_components_f22009_0_26\n + genetic_principal_components_f22009_0_27\n + genetic_principal_components_f22009_0_28\n + genetic_principal_components_f22009_0_29\n + genetic_principal_components_f22009_0_30\n + PGS001849',
@@ -1401,7 +1611,7 @@ def fit(
 #     clumping_variants_df=clumping_variants_df,
 # )
 
-# %% {"tags": []}
+# %%
 import statsmodels.formula.api as smf
 
 from threadpoolctl import threadpool_limits
@@ -1481,7 +1691,7 @@ def regression(
             )
             
             # Finally, pass data to the fit function
-            retval = fit(
+            retval = test_association(
                 pd_df,
                 groupby_columns=groupby_columns,
                 full_formula=full_formula,
@@ -1512,24 +1722,26 @@ def regression(
             t.StructField("lr_stat", t.DoubleType()),
             t.StructField("lr_pval", t.DoubleType()),
             t.StructField("lr_df_diff", t.DoubleType()),
+            t.StructField("most_associating_term", t.StringType()),
         ])
     )
 
+_test_term = f"I(Q('{phenotype_col}') ** 2)"
 _test = regression(
     dataframe=spark.createDataFrame(covariates_df.select("individual").collect().to_pandas().assign(gene="ENSG00000084674")), 
     groupby_columns=["gene"],
-    full_formula=restricted_formula,
+    full_formula=f"{restricted_formula} + {_test_term}",
     restricted_formula=restricted_formula,
     covariates_df=normalized_covariates_df,
     clumping_variants_df=broadcast_clumping_variants_df,
 ).toPandas()
 
 # %%
-assert _test.iloc[0]["lr_df_diff"] == 0
+assert _test.iloc[0]["most_associating_term"] == _test_term
 display(_test)
-del _test
+del _test, _test_term
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # # read features
 
 # %%
@@ -1670,7 +1882,7 @@ regression_results_sdf.printSchema()
 # gene_list = renamed_features_df.select("gene").distinct().limit(10).toPandas()["gene"].tolist()
 # gene_list
 
-# %% [raw] {"tags": []}
+# %% [raw]
 # gene_list = ['ENSG00000004059']
 # gene_list = ['ENSG00000004059', 'ENSG00000171505']
 # gene_list = [
@@ -1685,7 +1897,7 @@ regression_results_sdf.printSchema()
 #     'ENSG00000242515',
 # ]
 
-# %% [raw] {"tags": []}
+# %% [raw]
 # %%time
 # test = regression(
 #     renamed_features_df.filter(f.col("gene").isin(
@@ -1708,7 +1920,7 @@ regression_results_sdf.printSchema()
 
 # %% [raw]
 # %%time
-# test = fit(
+# test = test_association(
 #     test_df, 
 #     groupby_columns=groupby_columns, 
 #     full_formula=full_formula,
@@ -1741,13 +1953,13 @@ regression_results_sdf.printSchema()
 # %%
 snakemake.output
 
-# %% {"tags": []}
+# %%
 regression_results_sdf.write.parquet(snakemake.output["associations_pq"], mode="overwrite")
 
 # %%
 # regression_results_sdf = spark.read.parquet(snakemake.output["associations_pq"])
 
-# %% [raw] {"tags": []}
+# %% [raw]
 # # read association results
 
 # %% [raw]

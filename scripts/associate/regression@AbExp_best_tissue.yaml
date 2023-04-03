@@ -117,3 +117,4 @@ groupby_columns:
 - "gene"
 # - "subtissue"
 
+aggregate_variables: True

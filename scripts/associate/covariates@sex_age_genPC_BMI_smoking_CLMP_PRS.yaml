@@ -1,12 +1,26 @@
 ---
+register_phenotypes:
+- "BodyMassIndex"
+- "smoking_prefer_not_to_answer"
+- "smoking_never"
+- "smoking_previous"
+- "smoking_current"
+
 # formula will be joined with '+' signs
 restricted_formula:
 - '{wildcards.phenotype_col} ~ 1'
 - 'age_when_attended_assessment_centre_f21003_0_0'
 - 'sex_f31_0_0'
 - 'age_when_attended_assessment_centre_f21003_0_0 : sex_f31_0_0'
-- 'I(age_when_attended_assessment_centre_f21003_0_0 ** 2)'
-- 'I(age_when_attended_assessment_centre_f21003_0_0 ** 2) : sex_f31_0_0'
+- 'I(Q("age_when_attended_assessment_centre_f21003_0_0") ** 2)'
+- 'I(Q("age_when_attended_assessment_centre_f21003_0_0") ** 2) : sex_f31_0_0'
+- 'BodyMassIndex'
+- "smoking_prefer_not_to_answer"
+- "smoking_never"
+- "smoking_previous"
+- "smoking_current"
+# quitted smokers
+- "smoking_previous : smoking_current"
 - 'genetic_principal_components_f22009_0_1'
 - 'genetic_principal_components_f22009_0_2'
 - 'genetic_principal_components_f22009_0_3'
@@ -48,6 +62,8 @@ restricted_formula:
 # - 'genetic_principal_components_f22009_0_39'
 # - 'genetic_principal_components_f22009_0_40'
 
-add_clumping: False
-# clumping_gene_padding: 250000
+add_clumping: True
+clumping_gene_padding: 250000
+
+add_PRS: True
 

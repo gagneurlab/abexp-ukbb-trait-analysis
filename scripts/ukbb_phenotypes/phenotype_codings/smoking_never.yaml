@@ -1,0 +1,9 @@
+
+type: all
+
+fill_value: False
+
+fields:
+  # field.showcase: [list of matching terms]
+  'smoking_status_f20116_(\d*)_0':
+  - '0'

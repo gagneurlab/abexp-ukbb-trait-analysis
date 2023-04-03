@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -68,7 +68,7 @@ import pyspark.sql.functions as f
 
 # import glow
 
-# %% {"tags": []}
+# %%
 from rep.notebook_init import init_spark
 spark = init_spark(enable_glow=False)
 
@@ -94,7 +94,8 @@ except NameError:
             # "phenotype": "standing_height",
             # "phenotype": "HDL_cholesterol",
             # "phenotype": "Triglycerides",
-            "phenotype": "BodyMassIndex",
+            # "phenotype": "smoking_never",
+            "phenotype": "smoking_current",
             # "phenotype": "Asthma",
         }
     )
@@ -115,7 +116,7 @@ print(json.dumps(phenotype_coding, indent=2, default=str))
 # %% [markdown]
 # # find required fields
 
-# %% {"tags": []}
+# %%
 # schema:
 # { <aggregation>: {<col_regex>: [<list of matching terms>]} }
 required_columns = set()
@@ -125,7 +126,7 @@ for regex in phenotype_coding["fields"]:
     required_columns.update(matching_colnames)
 required_columns
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # # read data
 
 # %%
@@ -148,7 +149,7 @@ len(data_dfs)
 # %%
 from functools import reduce
 
-# %% {"tags": []}
+# %%
 joined_data_df = reduce(lambda df1, df2: df1.join(df2, on="eid", how="outer"), data_dfs)
 joined_data_df.columns
 
@@ -173,6 +174,27 @@ if phenotype_coding["type"] == "any":
 
     phenotype_expr = reduce(lambda a, b: a | b, col_terms)
 
+# %%
+if phenotype_coding["type"] == "all":
+    # schema:
+    # { <aggregation>: {<col_regex>: [<list of matching terms>]} }
+    # expand terms
+    col_terms = []
+    all_terms_null = []
+    for regex, terms in phenotype_coding["fields"].items():
+        matching_cols = meta_df["col.name"].str.match(regex)
+        matching_colnames = meta_df["col.name"].loc[matching_cols]
+
+        for col in matching_colnames:
+            # expr = f.coalesce(f.col(col).isin(terms), f.lit(False))
+            expr = f.col(col).isin(terms) | f.isnull(f.col(col))
+            col_terms.append(expr)
+            all_terms_null.append(f.isnull(f.col(col)))
+
+    all_terms_null_expr = reduce(lambda a, b: a & b, all_terms_null) 
+    
+    phenotype_expr = f.when(~ all_terms_null_expr, reduce(lambda a, b: a & b, col_terms))
+    
 
 # %%
 def mean_agg(col, ignore_null=True, ignore_nan=True):

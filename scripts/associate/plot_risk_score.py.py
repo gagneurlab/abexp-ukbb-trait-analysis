@@ -188,9 +188,6 @@ prc_df = pd.concat([prc_baseline_df, prc_full_df])
 # ### Scatter Predictions
 
 # %% {"tags": []}
-plot_df["full_model_new_risk"].sum()
-
-# %% {"tags": []}
 plot_df = pred_df[["phenotype_col", "measurement", "basic_model_pred", "restricted_model_pred", "full_model_pred", "full_model_new_risk"]].rename(columns={
     "restricted_model_pred": f"Age+Sex+PC+PRS \n r²={restricted_model_r2:.3f}" ,"full_model_pred": f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']} \n r²={full_model_r2:.3f}", "basic_model_pred": f"Age+Sex+PC \n r²={basic_model_r2:.3f}"
 })
