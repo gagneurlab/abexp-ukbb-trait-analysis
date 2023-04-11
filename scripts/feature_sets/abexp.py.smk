@@ -17,6 +17,7 @@ rule feature_sets__abexp:
         data_pq_done=touch(f"{OUTPUT_BASEPATH}/data.parquet.done"),
     input:
         abexp_predictions=config["abexp_predictions"],
+        agg_config=ancient(f"{SNAKEFILE_DIR}/abexp@{{agg}}.yaml"),
     params:
         nb_script=f"{SCRIPT}",
 #     log:

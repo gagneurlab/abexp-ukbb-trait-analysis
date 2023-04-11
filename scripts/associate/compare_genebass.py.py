@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -27,6 +27,9 @@ import yaml
 
 import polars as pl
 
+
+# %%
+import rep.polars_functions as plf
 
 # %%
 import plotnine as pn
@@ -72,17 +75,19 @@ except NameError:
             # "phenotype_col": "Asthma",
             # "phenotype_col": "severe_LDL",
             # "phenotype_col": "triglycerides_f30870_0_0",
-            #"phenotype_col": "hdl_cholesterol_f30760_0_0",
+            # "phenotype_col": "Aspartate_aminotransferase",
             "phenotype_col": "HDL_cholesterol",
-            "feature_set": "LOFTEE_pLoF",
-            # "feature_set": "AbExp_all_tissues",
+            # "feature_set": "LOFTEE_pLoF",
+            "feature_set": "AbExp_all_tissues",
+            # "feature_set": "AbExp_best_tissue",
             # "feature_set": "max_AbExp",
             # "covariates": "sex_age_genPC",
-            "covariates": "sex_age_genPC_CLMP_PRS",
+            # "covariates": "sex_age_genPC_CLMP_PRS",
+            "covariates": "sex_age_genPC_BMI_smoking_CLMP_PRS",
         }
     )
 
-# %% {"tags": []}
+# %%
 from snakemk_util import pretty_print_snakemake
 print(pretty_print_snakemake(snakemake))
 
@@ -96,7 +101,7 @@ else:
 pval_cutoff = snakemake.params["pval_cutoff"]
 pval_cutoff
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # # read features
 
 # %%
@@ -121,7 +126,7 @@ phenocode
 protein_coding_genes_df = pl.scan_parquet(snakemake.input["protein_coding_genes_pq"])
 protein_coding_genes_df.head().collect()
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # ## read association results
 
 # %%
@@ -154,9 +159,6 @@ print(f"Corrected for {regression_results_df.shape[0]} association tests...")
 display(regression_results_df)
 
 # %%
-regression_results_df.filter(pl.col("lr_stat") < -300)["gene"].to_pandas()
-
-# %%
 did_not_converge = (
     pl.scan_parquet(snakemake.input["associations_pq"] + "/*.parquet")
     .filter(
@@ -170,15 +172,15 @@ did_not_converge
 did_not_converge["gene"].to_list()
 
 # %%
-regression_results_df["padj"].to_pandas().quantile(q=[0.5, 0.05, 0.001])
+regression_results_df["padj"].to_pandas().quantile(q=[0.5, pval_cutoff, 0.001])
 
 # %%
-(regression_results_df["padj"] < 0.05).sum()
+(regression_results_df["padj"] < pval_cutoff).sum()
 
 # %%
 # regression_results_df[regression_results_df["padj"] < 0.05]
 
-# %% {"tags": []}
+# %%
 genebass_300k_df = (
     pl.scan_parquet(snakemake.input["genebass_300k_pq"] + "/*.parquet")
     .filter(pl.col("annotation") == pl.lit("pLoF"))
@@ -198,7 +200,7 @@ genebass_300k_df.schema
 # %%
 genebass_300k_df
 
-# %% {"tags": []}
+# %%
 genebass_500k_df = (
     pl.scan_parquet(snakemake.input["genebass_500k_pq"] + "/*.parquet")
     .filter(pl.col("annotation") == pl.lit("pLoF"))
@@ -256,15 +258,71 @@ combined_regression_results_df = (
 )
 combined_regression_results_df
 
-
 # %% [markdown]
 # ## Plot
+
+# %% [markdown]
+# ## most important tissue
+
+# %%
+plot_df = (
+    regression_results_df
+    .groupby([
+        "phenotype_col",
+        "covariates",
+        "feature_set",
+        "most_associating_term",
+        (pl.col("padj") < pval_cutoff).alias("significant"),
+    ])
+    .count()
+    .sort("count")
+    .with_columns(
+        (
+            pl.col('most_associating_term')
+            .apply(lambda x: plf.denormalise_name(x))
+            .cast(pl.datatypes.Utf8())
+            .str.replace_all(r"""Q\(["'](.*)['"]\)""", r"$1")
+            .str.replace_all(r"""AbExp@AbExp_""", r"")
+        )
+    )
+)
+plot_df
+
+# %%
+plot_df.write_parquet(snakemake.output["most_associating_terms_pq"])
+
+# %%
+plot = (
+    pn.ggplot(plot_df, pn.aes(x="reorder(most_associating_term, count)", y="count", fill="significant"))
+    + pn.geom_bar(stat="identity", position="stack")
+    + pn.scale_y_log10()
+    + pn.labs(
+        title=f"most associating terms across the association tests for '{phenotype_col}'",
+        x=f"most associating term",
+        y=f"number of genes",
+    )
+    + pn.scale_fill_manual({False: "#595959", True: "red"})
+    + pn.theme(
+        # axis_text_x=pn.element_text(rotation=90),
+        figure_size=(8, 8),
+        title=pn.element_text(linespacing=1.4),
+    )
+    # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
+    + pn.coord_flip()
+)
+plot
+
+# %%
+path = snakemake.params["output_basedir"] + "/most_associating_terms"
+pn.ggsave(plot, path + ".png", dpi=DPI)
+pn.ggsave(plot, path + ".pdf", dpi=DPI)
+
 
 # %% [markdown]
 # ## full plot
 
 # %%
-def plot_pvalues(plot_df, x, y, cutoff=0.05, crop_pvalue=10**-150):
+def plot_pvalues(plot_df, x, y, cutoff=pval_cutoff, crop_pvalue=10**-150):
     plot_df = (
         plot_df
         .assign(**{
@@ -298,8 +356,8 @@ def plot_pvalues(plot_df, x, y, cutoff=0.05, crop_pvalue=10**-150):
     plot = (
         pn.ggplot(plot_df, pn.aes(x=x, y=y))
         + pn.geom_abline(slope=1, color="black", linetype="dashed")
-        + pn.geom_hline(yintercept=0.05, color="red", linetype="dashed")
-        + pn.geom_vline(xintercept=0.05, color="red", linetype="dashed")
+        + pn.geom_hline(yintercept=cutoff, color="red", linetype="dashed")
+        + pn.geom_vline(xintercept=cutoff, color="red", linetype="dashed")
         # + pn.geom_rect(
         #     xmax=1,
         #     xmin=0.05,

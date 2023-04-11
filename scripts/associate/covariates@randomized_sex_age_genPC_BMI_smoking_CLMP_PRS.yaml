@@ -1,0 +1,70 @@
+---
+register_phenotypes:
+- "BodyMassIndex"
+- "smoking_prefer_not_to_answer"
+- "smoking_never"
+- "smoking_previous"
+- "smoking_current"
+
+# formula will be joined with '+' signs
+restricted_formula:
+- '{wildcards.phenotype_col} ~ 1'
+- 'age_when_attended_assessment_centre_f21003_0_0'
+- 'sex_f31_0_0'
+- 'age_when_attended_assessment_centre_f21003_0_0 : sex_f31_0_0'
+- 'I(Q("age_when_attended_assessment_centre_f21003_0_0") ** 2)'
+- 'I(Q("age_when_attended_assessment_centre_f21003_0_0") ** 2) : sex_f31_0_0'
+- 'BodyMassIndex'
+- "smoking_prefer_not_to_answer"
+- "smoking_never"
+- "smoking_previous"
+- "smoking_current"
+# quitted smokers
+- "smoking_previous : smoking_current"
+- 'genetic_principal_components_f22009_0_1'
+- 'genetic_principal_components_f22009_0_2'
+- 'genetic_principal_components_f22009_0_3'
+- 'genetic_principal_components_f22009_0_4'
+- 'genetic_principal_components_f22009_0_5'
+- 'genetic_principal_components_f22009_0_6'
+- 'genetic_principal_components_f22009_0_7'
+- 'genetic_principal_components_f22009_0_8'
+- 'genetic_principal_components_f22009_0_9'
+- 'genetic_principal_components_f22009_0_10'
+- 'genetic_principal_components_f22009_0_11'
+- 'genetic_principal_components_f22009_0_12'
+- 'genetic_principal_components_f22009_0_13'
+- 'genetic_principal_components_f22009_0_14'
+- 'genetic_principal_components_f22009_0_15'
+- 'genetic_principal_components_f22009_0_16'
+- 'genetic_principal_components_f22009_0_17'
+- 'genetic_principal_components_f22009_0_18'
+- 'genetic_principal_components_f22009_0_19'
+- 'genetic_principal_components_f22009_0_20'
+# - 'genetic_principal_components_f22009_0_21'
+# - 'genetic_principal_components_f22009_0_22'
+# - 'genetic_principal_components_f22009_0_23'
+# - 'genetic_principal_components_f22009_0_24'
+# - 'genetic_principal_components_f22009_0_25'
+# - 'genetic_principal_components_f22009_0_26'
+# - 'genetic_principal_components_f22009_0_27'
+# - 'genetic_principal_components_f22009_0_28'
+# - 'genetic_principal_components_f22009_0_29'
+# - 'genetic_principal_components_f22009_0_30'
+# - 'genetic_principal_components_f22009_0_31'
+# - 'genetic_principal_components_f22009_0_32'
+# - 'genetic_principal_components_f22009_0_33'
+# - 'genetic_principal_components_f22009_0_34'
+# - 'genetic_principal_components_f22009_0_35'
+# - 'genetic_principal_components_f22009_0_36'
+# - 'genetic_principal_components_f22009_0_37'
+# - 'genetic_principal_components_f22009_0_38'
+# - 'genetic_principal_components_f22009_0_39'
+# - 'genetic_principal_components_f22009_0_40'
+
+add_clumping: True
+clumping_gene_padding: 250000
+
+add_PRS: True
+
+randomize_phenotype: True

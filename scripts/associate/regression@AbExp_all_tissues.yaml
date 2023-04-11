@@ -54,8 +54,7 @@ variables:
         - "Small%20Intestine%20-%20Terminal%20Ileum"
         - "Spleen"
         - "Stomach"
-        # remove testis bc of strange expression patterns
-        # - "Testis"
+        - "Testis"
         - "Thyroid"
         - "Uterus"
         - "Vagina"
@@ -106,7 +105,7 @@ fill_values:
     "feature.AbExp@AbExp.Small%20Intestine%20-%20Terminal%20Ileum": 0.0
     "feature.AbExp@AbExp.Spleen": 0.0
     "feature.AbExp@AbExp.Stomach": 0.0
-    # "feature.AbExp@AbExp.Testis": 0.0
+    "feature.AbExp@AbExp.Testis": 0.0
     "feature.AbExp@AbExp.Thyroid": 0.0
     "feature.AbExp@AbExp.Uterus": 0.0
     "feature.AbExp@AbExp.Vagina": 0.0
@@ -116,4 +115,3 @@ fill_values:
 groupby_columns:
 - "gene"
 # - "subtissue"
-

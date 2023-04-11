@@ -19,3 +19,4 @@ dependencies:
   - r-patchwork
   - r-ggtext
   - r-cairo
+  - r-ggnetwork

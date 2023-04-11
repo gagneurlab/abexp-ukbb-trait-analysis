@@ -15,6 +15,7 @@ rule associate__compare_genebass:
         significant_genes_pq=f"{OUTPUT_BASEPATH}/significant_genes.parquet",
         significant_genes_tsv=f"{OUTPUT_BASEPATH}/significant_genes.tsv",
         newly_found_genes_tsv=f"{OUTPUT_BASEPATH}/newly_found_genes.tsv",
+        most_associating_terms_pq=f"{OUTPUT_BASEPATH}/most_associating_terms.parquet",
         touch_file=touch(f"{OUTPUT_BASEPATH}/compare_genebass.done"),
     input:
         # genebass_pq=config["genebass_results_pq"].format(genebass_version="300k"),
