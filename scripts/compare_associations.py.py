@@ -83,8 +83,9 @@ except NameError:
         rule_name = 'compare_associations',
         default_wildcards={
             # "comparison": "all",
-            "comparison": "paper_figure",
+            # "comparison": "paper_figure",
             # "comparison": "paper_figure_all_traits",
+            "comparison": "bmi_smoking_best_tissue_test",
         }
     )
 
@@ -267,9 +268,10 @@ compare_monti_df = (
         "score_type",
         "gene",
         "genebass_500k_significant",
+        "lr_pval",
         "padj",
-        "rank",
-        "n_true",
+        # "rank",
+        # "n_true",
     ])
     .distinct()
     .persist()
@@ -293,6 +295,7 @@ score_types_df = (
         "covariates",
     )
     .agg(f.collect_set("score_type").alias("score_types"))
+    .persist()
 )
 score_types_df.printSchema()
 
@@ -304,12 +307,12 @@ score_types_df.printSchema()
 
 # %%
 from pyspark.sql import Window
-w = Window.partitionBy(
+grouping = [
     "phenotype_col",
     "covariates",
     "score_type",
-    "significant",
-)
+    # "significant",
+]
 
 plot_df = (
     score_types_df
@@ -319,29 +322,88 @@ plot_df = (
         "covariates",
     )
     .join(compare_monti_df, on=["phenotype_col", "covariates",], how="left")
+    .withColumn("rank", f.rank().over(Window.partitionBy(grouping).orderBy("lr_pval")))
+    .withColumn("n_true", f.sum(f.col("genebass_500k_significant").cast(t.LongType())).over(
+        Window.partitionBy(grouping).orderBy("padj").rowsBetween(Window.unboundedPreceding, 0)
+    ))
     .withColumn("significant", f.col("padj") < 0.05)
-    .withColumn('least_still_significant', (f.max('rank').over(w) == f.col('rank')) & f.col("significant"))
+    .withColumn('least_still_significant', (f.max('rank').over(Window.partitionBy(*grouping, "significant")) == f.col('rank')) & f.col("significant"))
     # .filter(f.col("phenotype_col") == f.lit("HDL_cholesterol"))
     .toPandas()
+)
+# pretty-print some names
+plot_df = plot_df.assign(
+    covariates="covariates:\n" + plot_df["covariates"].str.replace("_", " + "),
+    phenotype_col=(
+        plot_df["phenotype_col"]
+        .str.replace(r"_(f\d+_.*)", r"\n(\1)", regex=True)
+        .str.split("\n")
+        # .str.replace(r"_", r" ", regex=True)
+        .apply(
+            lambda s: "\n".join([
+                textwrap.fill(s[0].replace("_", " "), 12, break_long_words=False),
+                *s[1:]
+            ])
+        )
+        .astype("string[pyarrow]")
+    ),
 )
 plot_df
 
 # %%
+plot_df.query("least_still_significant").set_index(["phenotype_col", "score_type", "covariates", ]).sort_index()
+
+# %%
 plot = (
-    pn.ggplot(plot_df.query("rank <= 200"), pn.aes(
+    pn.ggplot(plot_df, pn.aes(
         x="rank",
         y="n_true",
         color="score_type"
     ))
     + pn.geom_step()
-    + pn.geom_step(plot_df.query("significant"), size=2)
-    + pn.geom_point(plot_df.query("least_still_significant"))
-    + pn.facet_wrap("phenotype_col", scales="free_y")
+    + pn.geom_step(plot_df.query("significant"), size=1)
+    + pn.geom_point(plot_df.query("least_still_significant"), size=2, shape="D")
+    + pn.facet_grid("phenotype_col ~ covariates", scales="free")
     + pn.theme(
-        figure_size=(16, 16)
+        figure_size=(12, 40)
+    )
+    + pn.labs(
+        title="p-value rank vs. number of genes found by GeneBass (500k WES)"
     )
 )
 plot
+
+# %%
+path = snakemake.params["output_basedir"] + "/genebass_replication.per_phenotype"
+pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+
+# %%
+rank_limit = 100
+
+plot = (
+    pn.ggplot(plot_df.query(f"rank < {rank_limit}"), pn.aes(
+        x="rank",
+        y="n_true",
+        color="score_type"
+    ))
+    + pn.geom_step()
+    + pn.geom_step(plot_df.query("significant"), size=1)
+    + pn.geom_point(plot_df.query("least_still_significant"), size=2, shape="D")
+    + pn.facet_grid("phenotype_col ~ covariates", scales="free")
+    + pn.theme(
+        figure_size=(12, 40)
+    )
+    + pn.labs(
+        title=f"Top {rank_limit} p-value ranks vs. number of genes found by GeneBass (500k WES)"
+    )
+)
+plot
+
+# %%
+path = snakemake.params["output_basedir"] + "/genebass_replication.per_phenotype_cropped"
+pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 
 # %% [markdown]
 # ### monti aggregated
@@ -357,23 +419,41 @@ plot_df = (
         "covariates",
     )
     .join(compare_monti_df, on=["phenotype_col", "covariates",], how="left")
-    .withColumn("rank", f.rank().over(Window.partitionBy("score_type").orderBy("padj")))
+    .withColumn("rank", f.rank().over(Window.partitionBy("covariates", "score_type").orderBy("lr_pval")))
     .withColumn("n_true", f.sum(f.col("genebass_500k_significant").cast(t.LongType())).over(
-        Window.partitionBy("score_type").orderBy("padj").rowsBetween(Window.unboundedPreceding, 0)
+        Window.partitionBy("covariates", "score_type").orderBy("padj").rowsBetween(Window.unboundedPreceding, 0)
     ))
     .withColumn("significant", f.col("padj") < 0.05)
     .withColumn(
         'least_still_significant',
-        (f.max('rank').over(Window.partitionBy("score_type", "significant")) == f.col('rank')) & f.col("significant")
+        (f.max('rank').over(Window.partitionBy("covariates", "score_type", "significant")) == f.col('rank')) & f.col("significant")
+        # (f.last('rank').over(Window.partitionBy("covariates", "score_type", "significant").orderBy("rank")) == f.col('rank')) & f.col("significant")
     )
     .sort("rank")
     # .filter(f.col("phenotype_col") == f.lit("HDL_cholesterol"))
     .toPandas()
 )
+# pretty-print some names
+plot_df = plot_df.assign(
+    covariates="covariates:\n" + plot_df["covariates"].str.replace("_", " + "),
+    phenotype_col=(
+        plot_df["phenotype_col"]
+        .str.replace(r"_(f\d+_.*)", r"\n(\1)", regex=True)
+        .str.split("\n")
+        # .str.replace(r"_", r" ", regex=True)
+        .apply(
+            lambda s: "\n".join([
+                textwrap.fill(s[0].replace("_", " "), 12, break_long_words=False),
+                *s[1:]
+            ])
+        )
+        .astype("string[pyarrow]")
+    ),
+)
 plot_df
 
 # %%
-plot_df.query("least_still_significant")
+plot_df.query("least_still_significant").set_index(["score_type", "covariates", ]).sort_index()
 
 # %%
 plot = (
@@ -382,9 +462,11 @@ plot = (
         y="n_true",
         color="score_type"
     ))
+    + pn.geom_abline(slope=1, linetype="dashed")
     + pn.geom_step()
-    + pn.geom_step(plot_df.query("significant"), size=2)
-    + pn.geom_point(plot_df.query("least_still_significant"))
+    + pn.geom_step(plot_df.query("significant"), size=1)
+    + pn.geom_point(plot_df.query("least_still_significant"), size=3, shape="D")
+    + pn.facet_wrap("covariates")
     + pn.theme(
         figure_size=(16, 16)
     )
@@ -392,8 +474,252 @@ plot = (
 plot
 
 # %%
+path = snakemake.params["output_basedir"] + "/genebass_replication.global"
+pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+
+# %%
+plot = (
+    pn.ggplot(plot_df, pn.aes(
+        x="rank",
+        y="n_true",
+        color="score_type"
+    ))
+    + pn.geom_abline(slope=1, linetype="dashed")
+    + pn.geom_step()
+    + pn.geom_step(plot_df.query("significant"), size=1)
+    + pn.geom_point(plot_df.query("least_still_significant"), size=3, shape="D")
+    + pn.facet_wrap("covariates")
+    + pn.xlim(0, 1000)
+    + pn.ylim(0, 200)
+    + pn.theme(
+        figure_size=(16, 16)
+    )
+)
+plot
+
+# %%
+path = snakemake.params["output_basedir"] + "/genebass_replication.global_cropped"
+pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+
+# %%
 feature_set_idx = pd.DataFrame({"feature_set": config["features_sets"][::-1]}).reset_index()
 feature_set_idx
+
+# %% [markdown]
+# ## barplot most relevant tissue
+
+# %%
+most_associating_terms_df = spark.read.parquet(*snakemake.input["most_associating_terms_pq"])
+most_associating_terms_df.printSchema()
+
+# %%
+globally_most_associating_terms_df = (
+    most_associating_terms_df
+    .groupby(
+        "covariates",
+        "feature_set",
+        "most_associating_term",
+        "significant",
+    )
+    .agg(f.sum("count").alias("count"))
+)
+globally_most_associating_terms_df = (
+    globally_most_associating_terms_df
+    .filter("significant")
+    .select(
+        "covariates",
+        "feature_set",
+        "most_associating_term",
+        f.col("count").alias("n_significant")
+    )
+    .join(
+        globally_most_associating_terms_df,
+        on=[
+            "covariates",
+            "feature_set",
+            "most_associating_term",
+        ],
+        how="right",
+    )
+    .fillna(0, subset="n_significant")
+)
+globally_most_associating_terms_df.printSchema()
+
+# %%
+plot_df = globally_most_associating_terms_df.toPandas()
+plot_df = plot_df.merge(feature_set_idx, on="feature_set", how="left")
+plot_df = plot_df.assign(
+    covariates=plot_df["covariates"].str.replace("_", "\n+ "),
+    # phenotype_col=(
+    #     plot_df["phenotype_col"]
+    #     .str.replace(r"_(f\d+_.*)", r"\n(\1)", regex=True)
+    #     .str.split("\n")
+    #     # .str.replace(r"_", r" ", regex=True)
+    #     .apply(
+    #         lambda s: "\n".join([
+    #             textwrap.fill(s[0].replace("_", " "), 12, break_long_words=False),
+    #             *s[1:]
+    #         ])
+    #     )
+    #     .astype("string[pyarrow]")
+    # ),
+    feature_set=(
+        plot_df["feature_set"]
+        .str.replace(r"_", r" ", regex=False)
+    ),
+)
+plot_df
+
+# %%
+for fset in plot_df.feature_set.unique().tolist():
+    plot = (
+        pn.ggplot(plot_df.query(f"feature_set == '{fset}'"), pn.aes(x="reorder(most_associating_term, n_significant)", y="count", fill="significant"))
+        + pn.geom_bar(stat="identity", position="stack")
+        + pn.scale_y_log10()
+        + pn.labs(
+            title=f"most associating terms across the association tests for '{fset}'",
+            x=f"most important term",
+            y=f"number of genes",
+        )
+        + pn.scale_fill_manual({False: "#595959", True: "red"})
+        + pn.theme(
+            figure_size=(2 + 2 * len(config["covariates"]), 8),
+            # axis_text_x=pn.element_text(rotation=90),
+            title=pn.element_text(linespacing=1.4),
+        )
+        + pn.facet_wrap(
+            "covariates",
+            # scales="free",
+        )
+        # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
+        + pn.coord_flip()
+    )
+    display(plot)
+    
+    path = snakemake.params["output_basedir"] + f"/most_associating_term@{fset}"
+    
+    print(f"Saving to '{path}'")
+    pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+
+# %%
+for fset in plot_df.feature_set.unique().tolist():
+    plot = (
+        pn.ggplot(plot_df.query(f"feature_set == '{fset}'").query("~ significant"), pn.aes(x="reorder(most_associating_term, count)", y="count"))
+        + pn.geom_bar(stat="identity", position="stack")
+        # + pn.scale_y_log10()
+        + pn.labs(
+            title=f"most associating terms across the association tests for '{fset}'",
+            x=f"most important term",
+            y=f"number of genes",
+        )
+        + pn.scale_fill_manual({False: "#595959", True: "red"})
+        + pn.theme(
+            figure_size=(2 + 2 * len(config["covariates"]), 8),
+            # axis_text_x=pn.element_text(rotation=90),
+            title=pn.element_text(linespacing=1.4),
+        )
+        + pn.facet_wrap(
+            "covariates",
+            # scales="free",
+        )
+        # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
+        + pn.coord_flip()
+    )
+    display(plot)
+    
+    path = snakemake.params["output_basedir"] + f"/most_associating_term.non_significant@{fset}"
+    
+    print(f"Saving to '{path}'")
+    pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+
+# %%
+for fset in plot_df.feature_set.unique().tolist():
+    plot = (
+        pn.ggplot(plot_df.query(f"feature_set == '{fset}'").query("significant"), pn.aes(x="reorder(most_associating_term, count)", y="count"))
+        + pn.geom_bar(stat="identity", position="stack")
+        # + pn.scale_y_log10()
+        + pn.labs(
+            title=f"most associating terms across the significant associations for '{fset}'",
+            x=f"most important term",
+            y=f"number of genes",
+        )
+        + pn.scale_fill_manual({False: "#595959", True: "red"})
+        + pn.theme(
+            figure_size=(2 + 2 * len(config["covariates"]), 8),
+            # axis_text_x=pn.element_text(rotation=90),
+            title=pn.element_text(linespacing=1.4),
+        )
+        + pn.facet_wrap(
+            "covariates",
+            # scales="free",
+        )
+        # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
+        + pn.coord_flip()
+    )
+    display(plot)
+    
+    path = snakemake.params["output_basedir"] + f"/most_associating_term.significant@{fset}"
+    
+    print(f"Saving to '{path}'")
+    pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+    pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+
+# %%
+plot_df = most_associating_terms_df.toPandas()
+plot_df = plot_df.merge(feature_set_idx, on="feature_set", how="left")
+plot_df = plot_df.assign(
+    covariates=plot_df["covariates"].str.replace("_", "\n+ "),
+    # phenotype_col=(
+    #     plot_df["phenotype_col"]
+    #     .str.replace(r"_(f\d+_.*)", r"\n(\1)", regex=True)
+    #     .str.split("\n")
+    #     # .str.replace(r"_", r" ", regex=True)
+    #     .apply(
+    #         lambda s: "\n".join([
+    #             textwrap.fill(s[0].replace("_", " "), 12, break_long_words=False),
+    #             *s[1:]
+    #         ])
+    #     )
+    #     .astype("string[pyarrow]")
+    # ),
+    feature_set=(
+        plot_df["feature_set"]
+        .str.replace(r"_", r" ", regex=False)
+    ),
+)
+plot_df
+
+# %% [raw]
+# for fset in plot_df.feature_set.unique().tolist():
+#     if fset != "AbExp all tissues":
+#         continue
+#     plot = (
+#         pn.ggplot(plot_df.query(f"feature_set == '{fset}'"), pn.aes(x="reorder(most_associating_term, count)", y="count", fill="significant"))
+#         + pn.geom_bar(stat="identity", position="stack")
+#         + pn.scale_y_log10()
+#         + pn.labs(
+#             title=f"most associating terms across the association tests",
+#             x=f"most important term",
+#             y=f"number of genes",
+#         )
+#         + pn.scale_fill_manual({False: "#595959", True: "red"})
+#         + pn.theme(
+#             figure_size=(2 + 2 * len(config["covariates"]), 6 * plot_df["phenotype_col"].unique().size),
+#             # axis_text_x=pn.element_text(rotation=90),
+#             title=pn.element_text(linespacing=1.4),
+#         )
+#         + pn.facet_grid(
+#             "phenotype_col ~ covariates",
+#             scales="free_y",
+#         )
+#         # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
+#         + pn.coord_flip()
+#     )
+#     display(plot)
 
 # %% [markdown]
 # ## barplot num. significants
@@ -434,22 +760,22 @@ plot = (
     )
     # + pn.geom_smooth(method = "lm", color="red")#, se = FALSE)
     + pn.theme(
-        figure_size=(2 + 2 * len(config["covariates"]), 1 * plot_df["phenotype_col"].unique().size),
+        figure_size=(2 + 2 * len(config["covariates"]), 1.5 * plot_df["phenotype_col"].unique().size),
         axis_text_x=pn.element_text(
             rotation=45,
-            hjust=0.5
+            hjust=1
         ),
-        strip_text_y=pn.element_text(
-            rotation=0,
-        ),
+        # strip_text_y=pn.element_text(
+        #     rotation=0,
+        # ),
         title=pn.element_text(linespacing=1.4),
     )
     + pn.facet_grid(
         "phenotype_col ~ covariates",
-        scales="free_x"
+        scales="free_y"
     )
     # + pn.coord_cartesian()
-    + pn.coord_flip()
+    # + pn.coord_flip()
 )
 
 # %%
@@ -498,6 +824,9 @@ for feature_x, feature_y in list(itertools.combinations(keys, 2)):
 
 # %% [markdown]
 # ## scatter-plot num. significants
+
+# %%
+grouping = ['phenotype_col', 'covariates', 'feature_set']
 
 # %%
 plot_df = num_significant_associations.set_index(grouping)["num_significant"].unstack("feature_set").reset_index()

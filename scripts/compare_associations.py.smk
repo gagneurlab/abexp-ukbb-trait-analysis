@@ -33,8 +33,8 @@ def _compare_associations_input_fn(wildcards, yaml_path=YAML_PATH):
             feature_set=config["features_sets"],
             covariates=config["covariates"],
         ),
-        "compare_genebass_done": expand(
-            rules.associate__regression.output["touch_file"],
+        "most_associating_terms_pq": expand(
+            rules.associate__compare_genebass.output["most_associating_terms_pq"],
             phenotype_col=config["phenotypes"], 
             feature_set=config["features_sets"],
             covariates=config["covariates"],
