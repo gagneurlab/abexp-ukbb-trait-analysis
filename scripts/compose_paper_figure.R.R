@@ -497,6 +497,15 @@ lower_lhs = (
 lower_lhs
 
 # %%
+path = paste0(snakemake@params$output_basedir, "/combined_r2_num_indiv")
+print(paste0("Saving to ", path, "..."))
+ggsave(paste0(path, ".png"), lower_lhs, width = 10, height = 8, dpi=600, type = "cairo")
+ggsave(paste0(path, ".pdf"), lower_lhs, width = 10, height = 8, dpi=600, device=cairo_pdf)
+
+# display_pdf(file=paste0(path, ".pdf"))
+display_png(file=paste0(path, ".png"))
+
+# %%
 as_ggplot(cowplot::get_legend(
     plot_2
     + guides(fill="none")
