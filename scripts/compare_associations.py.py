@@ -129,7 +129,7 @@ snakemake.input["associations_pq"]
 # %%
 regression_results_df = (
     spark.read.parquet(*snakemake.input["associations_pq"])
-    # .sort("rsquared", reverse=True)
+    # .sort("rsquared", descending=True)
     # .drop([
     #     "term_pvals",
     #     "params",

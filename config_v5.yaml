@@ -32,6 +32,7 @@ paper_figure: "/s/project/rep/processed/trait_associations_v5/ukbb_wes_200k/pape
 
 trait_associations: "/s/project/rep/processed/trait_associations_v5/ukbb_wes_200k/associate/{phenotype_col}"
 trait_association_comparison: "/s/project/rep/processed/trait_associations_v5/ukbb_wes_200k/compare_associations"
+stringdb_comparison: "/s/project/rep/processed/trait_associations_v5/ukbb_wes_200k/compare_associations"
 risk_score_comparison: "/s/project/rep/processed/trait_associations_v5/ukbb_wes_200k/compare_risk_scores"
 feature_sets_dir: "/s/project/rep/processed/trait_associations_v5/ukbb_wes_200k/feature_sets"
 samples: "/s/project/rep/processed/trait_associations_v5/ukbb_wes_200k/samples.txt"

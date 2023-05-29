@@ -82,8 +82,8 @@ except NameError:
             # "feature_set": "AbExp_best_tissue",
             # "feature_set": "max_AbExp",
             # "covariates": "sex_age_genPC",
-            # "covariates": "sex_age_genPC_CLMP_PRS",
-            "covariates": "sex_age_genPC_BMI_smoking_CLMP_PRS",
+            "covariates": "sex_age_genPC_CLMP_PRS",
+            # "covariates": "sex_age_genPC_BMI_smoking_CLMP_PRS",
         }
     )
 
@@ -137,7 +137,7 @@ regression_results_df = (
     pl.scan_parquet(snakemake.input["associations_pq"] + "/*.parquet")
     .filter(pl.col("restricted_model_converged"))
     .filter(pl.col("full_model_converged"))
-    .sort("rsquared", reverse=True)
+    .sort("rsquared", descending=True)
     .drop([
         "term_pvals",
         "params",

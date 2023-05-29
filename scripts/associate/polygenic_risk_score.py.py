@@ -171,7 +171,7 @@ print(f"Correcting for {correction_value} association tests...")
 # %%
 regression_results_df = (
     regression_results_df
-    .sort("rsquared", reverse=True)
+    .sort("rsquared", descending=True)
     .withColumn("padj", f.array_min(f.array(
         f.col("lr_pval") * f.lit(correction_value),
         f.lit(1.0),

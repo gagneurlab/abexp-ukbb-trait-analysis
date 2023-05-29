@@ -15,6 +15,7 @@ include: f"{SNAKEFILE_DIR}/plot_risk_score.py.smk"
 # include: f"{SNAKEFILE_DIR}/lm_plot.py.smk"
 include: f"{SNAKEFILE_DIR}/samples.py.smk"
 include: f"{SNAKEFILE_DIR}/train_test_split.py.smk"
+# include: f"{SNAKEFILE_DIR}/significant_associations.py.smk"
 include: f"{SNAKEFILE_DIR}/get_stringdb_image.py.smk"
 
 # subdirectories
