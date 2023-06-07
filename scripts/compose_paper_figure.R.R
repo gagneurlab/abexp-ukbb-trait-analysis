@@ -114,8 +114,8 @@ plot_df$phenotype_col
 # %%
 traits_to_show = c(
     # "LDL direct",
-    "Albumin",
-    "Alkaline\nphosphatase",
+    #"Albumin",
+    #"Alkaline\nphosphatase",
     # "Aspartate\naminotransferase",
     # "Basophill\ncount",
     # "Phosphate",
@@ -128,8 +128,8 @@ traits_to_show = c(
     "HDL\ncholesterol",
     'Mean sphered\ncell volume',
     "Triglycerides",
-    # "Alanine\naminotransferase",
-    "Apolipoprotein\nA",
+    #"Alanine\naminotransferase",
+    #"Apolipoprotein\nA",
     # "c reactive\nprotein"
     ""
 )
@@ -142,9 +142,11 @@ plot_1 = (
     + geom_abline(slope=1, color="black", linetype="dashed")
     + labs(
         title="Number of significantly associating genes\n(p-values, alpha=0.05)",
-        x="LOFTEE pLoF",
-        y="AbExp-DNA (all tissues)"
+        x="Genes discovered by LOFTEE pLoF",
+        y=" \nGenes discovered by AbExp"
     )
+    + scale_x_continuous(limits = c(0, 30))
+    + scale_y_continuous(limits = c(0, 30))
     + theme(
         # figure.size=c(6, 4),
         axis.text.x=element_text(
@@ -164,7 +166,7 @@ plot_1 = (
         aes(label=`phenotype_col`)
     )
     # + facet_wrap("covariates")
-    # + coord_equal()
+    + coord_equal()
     + THEME
 )
 
@@ -233,17 +235,17 @@ plot_2 <- (
     )
     # + geom_text(
     # geom_label(aes(label=str_wrap(Period,12), x=(StartDate + EndDate)/2), size=3)
-    + scale_fill_gradient(name = "Nr. of individuals", trans = "log", breaks=c(1, 10, 100, 1000), low="lightgrey", high="black")
+    + scale_fill_gradient(name = "Individuals", trans = "log", breaks=c(1, 10, 100, 1000), low="lightgrey", high="black")
     + scale_color_manual(
         name="",
         values=c(`TRUE`="orange"),
-        labels=c(`TRUE`="significantly different\nto common-variant model"),
+        labels=c(`TRUE`="Prediction differs by 1 SD"),
         na.value = "#00000000"
     )
     + coord_fixed()
     + labs(
-        x="Age + Sex + PC + PRS + AbExp-DNA (all tissues)",
-        y="Age + Sex + PC + PRS",
+        x="Prediction based on common variants and AbExp",
+        y="Prediction based on common variants",
         title=paste0("Predictions for '", phenotype_col, "' of\ncommon-variant model vs. AbExp-DNA model")
     )
     + THEME
@@ -280,20 +282,20 @@ plot_3 <- (
     ggplot(plot_df, aes(
         x=`value`,
         y=`measurement`,
-        color=`full_model_new_risk`
+        color=`full_model_new_risk`,
     ))
     + geom_bin2d(bins=100, linewidth=0.3)
     + geom_smooth(method="lm", color="red")
-    + scale_fill_gradient(name = "Nr. of individuals", trans = "log", breaks=c(1, 10, 100, 1000), low="lightgrey", high="black")
+    + scale_fill_gradient(name = "Individuals", trans = "log", breaks=c(1, 10, 100, 1000), low="lightgrey", high="black")
     + scale_color_manual(
         name="",
         values=c(`TRUE`="orange"),
-        labels=c(`TRUE`="significantly different\nto common-variant model"),
+        labels=c(`TRUE`="Prediction differs by 1 SD"),
         na.value = "#00000000"
     )
     # + coord_fixed()
     + labs(
-        x="Age + Sex + PC + PRS + AbExp-DNA (all tissues)",
+        x="Prediction based on common variants and AbExp",
         y=paste0("'", phenotype_col, "'\nmeasurement"),
         title=paste0("Predictions for '", phenotype_col, "' of\ncommon-variant model vs. AbExp-DNA model")
     )
@@ -354,12 +356,12 @@ plot_4 = (
         labels=c(`TRUE`="significant"),
         na.value = "black"
     )
-    # + scale_y_continuous(
-    #     labels=scales::percent
-    # )
+    + scale_y_continuous(
+        labels=scales::percent
+    )
     + labs(
         x="phenotype",
-        y="proportional difference in r² between 'AbExp-DNA (all tissues)' and 'LOFTEE pLoF'",
+        y="relative increase in r² between 'AbExp' and 'LOFTEE pLoF'",
         title="Comparison of phenotype prediction models using different feature sets",
     )
     + THEME
@@ -405,24 +407,28 @@ plot_df
 
 # %%
 plot_5 = (
-    ggplot(plot_df, aes(x=reorder(`phenotype_col`, `reduce`), fill = `feature_set`, width=.8))
-    + geom_col(aes(y=-`increase`), position=position_dodge(width=0.8, preserve='single'), alpha=0.8)
+    ggplot(subset(plot_df, sd_cutoff == '1'), aes(x=reorder(`phenotype_col`, `reduce`), fill = `feature_set`, width=.8))
+    + geom_col(aes(y=-`increase`), position=position_dodge(width=0.8, preserve='single'), alpha=1)
     + geom_col(aes(y=`reduce`), position=position_dodge(width=0.8, preserve='single'))
     # + geom_col(aes(y="-increase"), position=positions.position_dodge(preserve='single'), alpha=0.5)
     # + geom_col(aes(y="reduce"), position=positions.position_dodge(preserve='single'))
     + geom_hline(aes(yintercept = 0))
     + scale_x_discrete(breaks=phenotype_label_order)
+    + scale_fill_manual(values=c("orange", "#619CFF"),labels=c(
+                `AbExp_all_tissues` = "AbExp",
+                `LOFTEE_pLoF` = "LOFTEE pLoF"
+    ))
     + theme(
         # figure_size=(8, 8),
     )
-    + facet_wrap("sd_cutoff_label", scales="free_x")
+    #+ facet_wrap("sd_cutoff_label", scales="free_x")
     # + scale_x_discrete(limits=plot_df.query("feature_set=='AbExp_all_tissues' and sd_cutoff==1").sort_values("reduce")["phenotype_col"].to_list())
     # + scale_fill_manual(["red", "blue"],breaks=reversed(["LOFTEE_pLoF", "AbExp_all_tissues"]))
     + coord_flip()
     + labs(
         y='Nr. of individuals with:\n◀---- increased prediction error ---- ┃ ---- reduced prediction error ----▶',
         x="phenotype",
-        title="Number of individuals where\nthe absolute error compared to the common-variant model\nchanges by more than [1.0, 1.5, 2.0] standard deviation(s)"
+        title="Number of individuals where\nthe absolute error compared to the common-variant model\nchanges by more than 1.0 standard deviation"
     )
     + THEME
     + theme(
@@ -451,7 +457,7 @@ lower_lhs = (
         plot_4 
         + ggtitle(NULL)
         + xlab("")
-        + ylab("proportional difference in r² between\n AbExp-DNA and LOFTEE pLoF")
+        + ylab("Relative increase in r² between\n AbExp and LOFTEE pLoF")
         + theme(
             # axis.title.y = element_blank(),
             legend.position = "bottom"
@@ -470,7 +476,7 @@ lower_lhs = (
             )
         )
         + ggtitle(NULL)
-        + ylab("Nr of individuals with:\n◀---- increased error ---- ┃ ---- reduced error ----▶")
+        + ylab("Individuals with:\n◀-- increased error -- ┃ -- reduced error --▶")
         + theme(
             axis.text.y = element_blank(),
             axis.title.y = element_blank(),
@@ -479,12 +485,25 @@ lower_lhs = (
             # legend.title = element_blank(),
             legend.position = "bottom"
         )
+        + scale_fill_manual(values=c("orange", "#619CFF"),labels=c(
+                `AbExp_all_tissues` = "AbExp",
+                `LOFTEE_pLoF` = "LOFTEE pLoF"
+    ))
     )
-    + ylab("proportional difference in r² between\n AbExp-DNA and LOFTEE pLoF")
-    + plot_layout(widths = c(1, 2))
+    #+ ylab("proportional difference in r² between\n AbExp-DNA and LOFTEE pLoF")
+    + plot_layout(widths = c(1, 1))
     & theme(plot.margin = margin(0,0,0,0))
 )
 lower_lhs
+
+# %%
+path = paste0(snakemake@params$output_basedir, "/combined_r2_num_indiv")
+print(paste0("Saving to ", path, "..."))
+ggsave(paste0(path, ".png"), lower_lhs, width = 10, height = 8, dpi=600, type = "cairo")
+ggsave(paste0(path, ".pdf"), lower_lhs, width = 10, height = 8, dpi=600, device=cairo_pdf)
+
+# display_pdf(file=paste0(path, ".pdf"))
+display_png(file=paste0(path, ".png"))
 
 # %%
 as_ggplot(cowplot::get_legend(
@@ -538,6 +557,7 @@ rhs = (
     wrap_plots(rhs) / as_ggplot(cowplot::get_legend(
         plot_2
         + guides(fill="none")
+        + guides(color = guide_legend(override.aes = list(colour = "orange", linewidth = 10)))
         + theme(
             legend.background = element_rect(fill="#00000000")
         )
@@ -548,13 +568,13 @@ rhs
 
 # %%
 commonplot <- ggarrange(
-  ncol = 2, nrow = 1, widths = c(3,2),
-  ggarrange(nrow = 2, labels = c('a', 'c'), heights = c(1, 2), legend="bottom",
+  ncol = 2, nrow = 1, widths = c(1,2),
+  ggarrange(nrow = 2, ncol = 1, heights= c(1,2), labels = c('a', 'b'), legend="bottom", align="v",
             plot_1 + ggtitle(NULL),
-            lower_lhs
+            rhs
   ),
-  ggarrange(labels=c("b"),
-      rhs
+  ggarrange(labels=c("c"),
+      lower_lhs
   )
   # ggarrange(nrow = 2, labels = c('b', 'c'), heights = c(1,1), common.legend = TRUE, legend="bottom", align = "h",
   #           plot_2 + ggtitle("") + theme(
@@ -575,5 +595,7 @@ ggsave(paste0(path, ".svg"), commonplot, width = 16, height = 12, dpi=600, devic
 ggsave(paste0(path, ".pdf"), commonplot, width = 16, height = 12, dpi=600, device=cairo_pdf)
 
 display_png(file=paste0(path, ".png"))
+
+# %%
 
 # %%
