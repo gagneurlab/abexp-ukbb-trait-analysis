@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian3]
 #     language: python
@@ -60,7 +60,7 @@ from rep.notebook_init import init_ray, setup_plot_style
 init_ray()
 setup_plot_style()
 
-# %% tags=[]
+# %%
 import pyspark
 import pyspark.sql.types as t
 import pyspark.sql.functions as f

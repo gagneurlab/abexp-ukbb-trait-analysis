@@ -1,0 +1,56 @@
+---
+projectTitle: UKBB_Trait_Analysis
+# htmlOutputPath: /s/public_webshare/project/UKBB_Splicing_Analysis/html
+
+gtf_file: "/s/genomes/Gencode/Gencode_human/release_34/gencode.v34.annotation.gtf.gz"
+fasta_file: "/s/genomes/Gencode/Gencode_human/release_34/GRCh38.primary_assembly.genome.fa"
+
+protein_coding_genes_csv: "/s/project/rep/processed/trait_associations_v7/protein_coding_genes.hg38.csv"
+protein_coding_genes_pq: "/s/project/rep/processed/trait_associations_v7/protein_coding_genes.hg38.parquet"
+
+ukbb_raw_phenotypes_dir: "/s/raw/ukbiobank/phenotypes"
+ukbb_processed_phenotypes_dir: "/s/project/uk_biobank/processed/phenotypes"
+ukbb_decoded_phenotypes_dir: "/s/project/uk_biobank/processed/decoded_phenotypes"
+
+# input
+# "gs://ukbb-exome-public/300k/results/results.mt"
+genebass_results_mt: "/s/project/rep/processed/genebass/{genebass_version}/results.mt"
+# output
+genebass_results_pq: "/s/project/rep/processed/genebass/{genebass_version}/results.parquet"
+genebass_results_filtered_pq: "/s/project/rep/processed/genebass/{genebass_version}/filtered.parquet"
+genebass_filtered_phenotypes_pq: "/s/project/rep/processed/genebass/{genebass_version}/filtered_phenotypes.parquet"
+
+genebass_bonferroni_cutoff: 0.05
+
+monti_results_tsv: "/s/project/rep/processed/monti/230309_pvalues_all_genes_EUR.tsv"
+monti_results_pq: "/s/project/rep/processed/monti/230309_pvalues_all_genes_EUR.parquet"
+
+# config_dir will be copied to output_basedir
+config_dir: "config/ukbb_wes_200k"
+output_basedir: "/s/project/rep/processed/trait_associations_v7/ukbb_wes_200k"
+paper_figure: "/s/project/rep/processed/trait_associations_v7/ukbb_wes_200k/paper_figure"
+
+trait_associations: "/s/project/rep/processed/trait_associations_v7/ukbb_wes_200k/associate/{phenotype_col}"
+trait_association_comparison: "/s/project/rep/processed/trait_associations_v7/ukbb_wes_200k/compare_associations"
+stringdb_comparison: "/s/project/rep/processed/trait_associations_v7/ukbb_wes_200k/compare_associations"
+risk_score_comparison: "/s/project/rep/processed/trait_associations_v7/ukbb_wes_200k/compare_risk_scores"
+feature_sets_dir: "/s/project/rep/processed/trait_associations_v7/ukbb_wes_200k/feature_sets"
+samples: "/s/project/rep/processed/trait_associations_v7/ukbb_wes_200k/samples.txt"
+PRS_score_mapping: "/s/project/rep/processed/trait_associations_v7/ukbb_wes_200k/PRS_score_mapping.csv"
+monti_mapping: "/s/project/rep/processed/trait_associations_v7/ukbb_wes_200k/monti_mapping.csv"
+
+# feature sets
+# abexp_predictions: "/s/project/rep/processed/training_results_v13/ukbb_wes_200k/predict_all/fset=DNA_only_nosplice_tl010/gtex_v8_old_dna/dna_only/DNA_only_nosplice_tl010@train_simplecv.py#lightgbm/data.parquet"
+abexp_predictions: "/s/project/rep/processed/training_results_v13/ukbb_wes_200k/agg_veff_predictions/fset=DNA_only_splice_agg/gtex_v8_old_dna/dna_only/DNA_only_splice@train_simplecv.py#lightgbm/data.parquet"
+vep_predictions: "/s/project/rep/processed/training_results_v13/ukbb_wes_200k/feature_sets/aggregate_vep_spark.py@gt=any_tl=CANONICAL/data.parquet"
+vep_variants: "/s/project/rep/processed/training_results_v13/ukbb_wes_200k/veff/tissue_specific_vep.py@tl=CANONICAL/veff.parquet"
+# clumping
+# clumping_gtf_file: "/s/genomes/Gencode/Gencode_human/release_34/gencode.v34.annotation.gtf.gz"
+clumping_gtf_file: "/s/genomes/Gencode/Gencode_human/release_34/GRCh37_mapping/gencode.v34lift37.annotation.gtf.gz"
+
+# sample split configuration
+association_split: 0.666666666
+phenotype_prediction_folds: 5
+
+# misc
+num_samples_per_tissue: '/s/project/rep/processed/training_results_v13/gtex_v8_old_dna/plots/nr_samples_per_tissue.py/samples_per_tissue.parquet'

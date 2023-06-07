@@ -7,14 +7,14 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
 #     name: conda-env-anaconda-florian4-py
 # ---
 
-# %% {"tags": []}
+# %%
 from IPython.display import display
 
 import os
@@ -42,24 +42,24 @@ import sklearn.metrics
 
 from snakemk_util import pretty_print_snakemake
 
-# %% {"tags": []}
+# %%
 #snakemake.reload()
 
-# %% {"tags": []}
+# %%
 # %matplotlib inline
 # %config InlineBackend.figure_format='retina'
 
 from rep.notebook_init import setup_plot_style
 setup_plot_style()
 
-# %% {"tags": []}
+# %%
 snakefile_path = os.getcwd() + "/../../Snakefile"
 snakefile_path
 
-# %% {"tags": []}
+# %%
 # del snakemake
 
-# %% {"tags": []}
+# %%
 try:
     snakemake
 except NameError:
@@ -86,16 +86,16 @@ except NameError:
         }
     )
 
-# %% {"tags": []}
+# %%
 print(pretty_print_snakemake(snakemake))
 
-# %% {"tags": []}
+# %%
 if "plot_dpi" in snakemake.params:
     DPI = snakemake.params["plot_dpi"]
 else:
     DPI=450
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # # Load configuration
 
 # %% [raw]
@@ -108,7 +108,7 @@ else:
 # %% [raw]
 # print(json.dumps(config, indent=2, default=str))
 
-# %% {"tags": []}
+# %%
 phenotype_col = snakemake.wildcards["phenotype_col"]
 phenotype_col
 
@@ -119,11 +119,11 @@ phenotype_col
 # %% [markdown]
 # ## Read Predictions
 
-# %% {"tags": []}
+# %%
 pred_df = pd.read_parquet(snakemake.input["predictions_pq"])
 pred_df
 
-# %% {"tags": []}
+# %%
 full_model_r2 = sklearn.metrics.r2_score(pred_df["measurement"], pred_df["full_model_pred"])
 restricted_model_r2 = sklearn.metrics.r2_score(pred_df["measurement"], pred_df["restricted_model_pred"])
 basic_model_r2 = sklearn.metrics.r2_score(pred_df["measurement"], pred_df["basic_model_pred"])
@@ -134,10 +134,10 @@ measurement_std = pred_df["measurement"].std()
 pehnotype_mean = pred_df["measurement"].mean()
 phenotype_std = pred_df["measurement"].std()
 
-# %% {"tags": []}
+# %%
 measurement_std
 
-# %% {"tags": []}
+# %%
 nr_of_quantiles = 10
 
 pred_df = (
@@ -152,7 +152,7 @@ pred_df = (
     })
 )
 
-# %% {"tags": []}
+# %%
 pred_df = (
     pred_df
     .assign(**{
@@ -174,20 +174,20 @@ pred_df
 # %% [markdown]
 # ## Read PRC
 
-# %% {"tags": []}
+# %%
 # Read prc 
 prc_baseline_df = pd.read_parquet(snakemake.input["precision_recall_baseline_pq"])
 prc_full_df = pd.read_parquet(snakemake.input["precision_recall_full_pq"])
 #prc_plof_df = pd.read_parquet("/s/project/rep/processed/trait_associations_v3/ukbb_wes_200k/associate/Triglycerides/cov=sex_age_genPC_CLMP_PRS/fset=LOFTEE_pLoF/polygenic_risk_score/precision_recall.full.parquet")
 prc_df = pd.concat([prc_baseline_df, prc_full_df])
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # ## Plots
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # ### Scatter Predictions
 
-# %% {"tags": []}
+# %%
 plot_df = pred_df[["phenotype_col", "measurement", "basic_model_pred", "restricted_model_pred", "full_model_pred", "full_model_new_risk"]].rename(columns={
     "restricted_model_pred": f"Age+Sex+PC+PRS \n r²={restricted_model_r2:.3f}" ,"full_model_pred": f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']} \n r²={full_model_r2:.3f}", "basic_model_pred": f"Age+Sex+PC \n r²={basic_model_r2:.3f}"
 })
@@ -217,7 +217,7 @@ pn.ggsave(plot, path + ".pdf", dpi=DPI)
 plot_df.to_parquet(path + ".parquet", index=False)
 display(plot)
 
-# %% {"tags": []}
+# %%
 plot_df = pred_df[["full_model_pred", "restricted_model_pred", "full_model_new_risk"]].rename(columns = {"full_model_pred": f"Age+Sex+PC+PRS+{snakemake.wildcards['feature_set']}", "restricted_model_pred": "Age+Sex+PC+PRS"})
 
 plot = (

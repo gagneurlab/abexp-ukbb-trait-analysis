@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -29,12 +29,11 @@ import pyspark.sql.types as t
 import pyspark.sql.functions as f
 
 # import glow
+# -
 
 
-# + {"tags": []}
 from rep.notebook_init import init_spark
 spark = init_spark(enable_glow=False)
-# -
 
 spark
 

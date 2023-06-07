@@ -194,7 +194,7 @@ if phenotype_coding["type"] == "all":
     all_terms_null_expr = reduce(lambda a, b: a & b, all_terms_null) 
     
     phenotype_expr = f.when(~ all_terms_null_expr, reduce(lambda a, b: a & b, col_terms))
-    
+
 
 # %%
 def mean_agg(col, ignore_null=True, ignore_nan=True):

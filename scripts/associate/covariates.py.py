@@ -479,7 +479,7 @@ pgs_dfs = []
 for pgs_id, pgs_score_file_path in prs_score_mapping.select(["pgs_id", "pgs_score_file_path"]).rows():
     print(f"Loading '{pgs_id}'...")
     pgs_df = (
-        pl.read_csv(pgs_score_file_path, sep="\t")
+        pl.read_csv(pgs_score_file_path, separator="\t")
         .lazy()
         .rename({
             "#IID": "individual",

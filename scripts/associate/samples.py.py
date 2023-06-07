@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -150,7 +150,7 @@ filtered_data_df = (
 )
 filtered_data_df
 
-# %% {"tags": []}
+# %%
 samples_df = filtered_data_df.select("individual").to_pandas()
 samples_df
 
@@ -161,7 +161,7 @@ samples_df
 snakemake.output
 
 # %%
-filtered_data_df.select("individual").write_csv(snakemake.output["samples_tsv"], sep="\t")
+filtered_data_df.select("individual").write_csv(snakemake.output["samples_tsv"], separator="\t")
 
 # %%
 filtered_data_df.select("individual").write_parquet(snakemake.output["samples_pq"], use_pyarrow=True, compression="snappy")

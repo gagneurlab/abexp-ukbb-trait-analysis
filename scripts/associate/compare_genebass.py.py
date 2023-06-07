@@ -82,8 +82,8 @@ except NameError:
             # "feature_set": "AbExp_best_tissue",
             # "feature_set": "max_AbExp",
             # "covariates": "sex_age_genPC",
-            "covariates": "sex_age_genPC_CLMP_PRS",
-            # "covariates": "sex_age_genPC_BMI_smoking_CLMP_PRS",
+            # "covariates": "sex_age_genPC_CLMP_PRS",
+            "covariates": "sex_age_genPC_BMI_smoking_CLMP_PRS",
         }
     )
 
@@ -240,9 +240,9 @@ genebass_500k_df
 
 # %%
 combined_regression_results_df = pd.concat([
-    regression_results_df.with_column(pl.lit(snakemake.wildcards["feature_set"]).alias("score_type")).to_pandas(),
-    genebass_300k_df.with_column(pl.lit("Genebass (300k WES)").alias("score_type")).to_pandas(),
-    genebass_500k_df.with_column(pl.lit("Genebass (500k WES)").alias("score_type")).to_pandas(),
+    regression_results_df.with_columns(pl.lit(snakemake.wildcards["feature_set"]).alias("score_type")).to_pandas(),
+    genebass_300k_df.with_columns(pl.lit("Genebass (300k WES)").alias("score_type")).to_pandas(),
+    genebass_500k_df.with_columns(pl.lit("Genebass (500k WES)").alias("score_type")).to_pandas(),
 ], join="inner")
 
 combined_regression_results_df = (
@@ -515,9 +515,16 @@ significant_genes = (
 
 # %%
 stats_df = (
-    regression_results_df.to_pandas()
-    .set_index("gene")
-    .loc[:, [
+    pl.from_pandas(significant_genes.reset_index()).select(
+        "gene",
+        "gene_name",
+        "Genebass (300k WES)",
+        "Genebass_300k_signif",
+        "Genebass (500k WES)",
+        "Genebass_500k_signif",
+    )
+    .join(regression_results_df.select(
+        "gene",
         'n_observations',
         'restricted_model_converged',
         'full_model_converged',
@@ -531,15 +538,11 @@ stats_df = (
         'rsquared_diff',
         'lr_pval',
         'padj',
-    ]]
-    .join(significant_genes[[
-        "Genebass (300k WES)",
-        "Genebass_300k_signif",
-        "Genebass (500k WES)",
-        "Genebass_500k_signif",
-    ]], how="right")
-    .sort_values("padj")
-    .assign(**snakemake.wildcards)
+    ), on="gene", how="left")
+    .sort("padj")
+    .with_columns([
+        pl.lit(v).alias(k) for k, v in snakemake.wildcards.items()
+    ])
 )
 
 # %%
@@ -549,17 +552,16 @@ with pd.option_context('display.float_format', '{:,.2g}'.format):
     )
 
 # %%
-stats_df.reset_index().to_parquet(snakemake.output["significant_genes_pq"], index=False)
+stats_df.write_parquet(snakemake.output["significant_genes_pq"], statistics=True, use_pyarrow=True)
 
 # %%
-stats_df.reset_index().to_csv(snakemake.output["significant_genes_tsv"], index=False, header=True, sep="\t")
+stats_df.write_csv(snakemake.output["significant_genes_tsv"], separator="\t")
 
 # %%
 (
     stats_df
-    .query(f"padj < {snakemake.params['pval_cutoff']}")
-    .reset_index()
-    .to_csv(snakemake.output["newly_found_genes_tsv"], index=False, header=True, sep="\t")
+    .filter(pl.col("padj") < snakemake.params['pval_cutoff'])
+    .write_csv(snakemake.output["newly_found_genes_tsv"], separator="\t")
 )
 
 # %%

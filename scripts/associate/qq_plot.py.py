@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -59,7 +59,7 @@ setup_plot_style()
 # os.environ["RAY_ADDRESS"] = 'ray://192.168.16.28:10001'
 # os.environ["RAY_ADDRESS"]
 
-# %% [raw] {"tags": []}
+# %% [raw]
 #
 
 # %%
@@ -107,7 +107,7 @@ if "plot_dpi" in snakemake.params:
 else:
     DPI=450
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # # Load configuration
 
 # %%

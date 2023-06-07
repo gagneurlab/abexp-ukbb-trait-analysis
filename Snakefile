@@ -13,7 +13,7 @@ include: 'snakefile_utils.smk'
 # config['wBuildPath'] =  str(pathlib.Path(wbuild.__file__).parent)
 
 workdir: "./"
-configfile: "config_v5.yaml"
+configfile: "config_v7.yaml"
 
 # sync config directory
 eprint("Syncing config directory...")
@@ -49,14 +49,14 @@ hdl_cholesterol=expand(
     rules.associate__compare_genebass.output,
     phenotype_col="HDL_cholesterol", 
     feature_set=["LOFTEE_pLoF", "AbExp_all_tissues", "max_AbExp", "median_AbExp"],
-    covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS"],
+    covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS", "sex_age_genPC_BMI_smoking_CLMP_PRS"],
 )
 
 hdl_cholesterol_term_pvals=expand(
     rules.associate__compare_params.output,
     phenotype_col="HDL_cholesterol", 
     feature_set=["AbExp_all_tissues",],
-    covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS"],
+    covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS", "sex_age_genPC_BMI_smoking_CLMP_PRS"],
 )
 
 all_phenotypes = [
@@ -89,6 +89,7 @@ all_phenotypes_output = [
             "sex_age_genPC",
             "sex_age_genPC_CLMP",
             "sex_age_genPC_CLMP_PRS",
+            "sex_age_genPC_BMI_smoking_CLMP_PRS",
             # "randomized_sex_age_genPC_CLMP_PRS",
         ],
     ),
@@ -100,6 +101,7 @@ all_phenotypes_output = [
             "sex_age_genPC",
             "sex_age_genPC_CLMP",
             "sex_age_genPC_CLMP_PRS",
+            "sex_age_genPC_BMI_smoking_CLMP_PRS",
             # "randomized_sex_age_genPC_CLMP_PRS",
         ],
     ),
@@ -112,7 +114,7 @@ all_phenotypes_output = [
             "max_AbExp",
             "median_AbExp"
         ],
-        covariates=["randomized_sex_age_genPC_CLMP_PRS", ],
+        covariates=["randomized_sex_age_genPC_BMI_smoking_CLMP_PRS", ],
     ),
     # *expand(
     #     rules.associate__polygenic_risk_score.output,
@@ -132,12 +134,12 @@ rule all:
         # *hdl_cholesterol_term_pvals,
         #*all_phenotypes_output,
         expand(rules.compare_associations.output, comparison=[
-            "all",
+            # "all",
             "paper_figure",
             "paper_figure_all_traits",
         ]),
         expand(rules.compare_risk_scores.output, comparison=[
-            "all",
+            # "all",
             "paper_figure",
         ]),
         # expand(

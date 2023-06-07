@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -53,7 +53,7 @@ import matplotlib.pyplot as plt
 from rep.notebook_init import init_ray
 init_ray()
 
-# %% {"tags": []}
+# %%
 import ray
 from rep.notebook_init import init_spark_on_ray
 spark = init_spark_on_ray(
@@ -209,16 +209,16 @@ data_df = f.broadcast(data_df.sort("sample_id"))
 
 data_df.printSchema()
 
-# %% {"tags": []}
+# %%
 spark._jvm.System.gc()
 
-# %% {"tags": []}
+# %%
 phenotype_df = data_df.toPandas()
 
 # %%
 phenotype_df
 
-# %% {"tags": []}
+# %%
 import statsmodels.formula.api as smf
 from threadpoolctl import threadpool_limits
 from typing import List, Union
@@ -232,7 +232,7 @@ broadcast_phenotype_df = spark.sparkContext.broadcast(phenotype_df)
 broadcast_restricted_model = spark.sparkContext.broadcast(restricted_model)
 
 
-# %% {"tags": []}
+# %%
 def regression(
     dataframe: pyspark.sql.DataFrame,
     groupby_columns: List[str], 
@@ -324,7 +324,7 @@ assert _test.iloc[0]["lr_df_diff"] == 0
 display(_test)
 del _test
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # # read features
 
 # %% [markdown]
@@ -339,13 +339,13 @@ abexp_sdf = (
 )
 abexp_sdf.printSchema()
 
-# %% {"tags": []}
+# %%
 abexp_sdf.select("subtissue").distinct().sort("subtissue").toPandas()
 
 # %%
 abexp_sdf.printSchema()
 
-# %% {"tags": []}
+# %%
 test_df = (
     abexp_sdf
     .filter(f.col("gene") == f.lit('ENSG00000130173'))
@@ -385,13 +385,13 @@ abexp_regression_results_sdf = regression(
 )
 abexp_regression_results_sdf.printSchema()
 
-# %% {"tags": []}
+# %%
 abexp_regression_results_sdf.write.parquet(snakemake.output["associations_pq"] + "/score_type=AbExp_DNA", mode="overwrite")
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # ## pLoF counts
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # ### read pLoF counts
 
 # %%
@@ -406,7 +406,7 @@ plof_counts_sdf = (
 )
 plof_counts_sdf.printSchema()
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # ### perform regression
 
 # %%
@@ -419,7 +419,7 @@ plof_regression_results_sdf = regression(
 )
 plof_regression_results_sdf.printSchema()
 
-# %% {"tags": []}
+# %%
 plof_regression_results_sdf.write.parquet(snakemake.output["associations_pq"] + "/score_type=pLoF", mode="overwrite")
 
 # %% [markdown]
@@ -454,10 +454,10 @@ joint_regression_results_sdf = regression(
 )
 joint_regression_results_sdf.printSchema()
 
-# %% {"tags": []}
+# %%
 joint_regression_results_sdf.write.parquet(snakemake.output["associations_pq"] + "/score_type=joint", mode="overwrite")
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # # compare pvalues
 
 # %% [markdown]
@@ -467,7 +467,7 @@ joint_regression_results_sdf.write.parquet(snakemake.output["associations_pq"] +
 protein_coding_genes_df = pd.read_parquet(snakemake.input["protein_coding_genes_pq"])#[["gene_id", "gene_name"]]
 protein_coding_genes_df
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # ## read association results
 
 # %%
@@ -487,7 +487,7 @@ abexp_regression_results_df = (
 abexp_regression_results_df
 abexp_regression_results_df
 
-# %% {"tags": []}
+# %%
 plof_regression_results_df = (
     spark.read.parquet(snakemake.output["associations_pq"] + "/score_type=pLoF")
     .sort("rsquared", ascending=False)
@@ -495,7 +495,7 @@ plof_regression_results_df = (
     .toPandas()
 )
 
-# %% {"tags": []}
+# %%
 # joint_regression_results_df = ( 
 #     spark.read.parquet(snakemake.output["associations_pq"] + "/score_type=joint")
 #     .filter(f.col("subtissue").isNotNull())
@@ -503,7 +503,7 @@ plof_regression_results_df = (
 #     .toPandas()
 # )
 
-# %% {"tags": []}
+# %%
 # joint_regression_results_df_melted = ( 
 #     spark.read.parquet(snakemake.output["associations_pq"] + "/score_type=joint")
 #     .filter(f.col("subtissue").isNotNull())
@@ -514,7 +514,7 @@ plof_regression_results_df = (
 #     .toPandas()
 # )
 
-# %% {"tags": []}
+# %%
 genebass_sdf = (
     spark.read.parquet("/s/project/rep/processed/genebass/results.parquet/")
     .filter(f.col("annotation") == f.lit("pLoF"))
@@ -522,7 +522,7 @@ genebass_sdf = (
 )
 genebass_sdf.printSchema()
 
-# %% {"tags": []}
+# %%
 genebass_pd_df = genebass_sdf.toPandas()
 
 # %%

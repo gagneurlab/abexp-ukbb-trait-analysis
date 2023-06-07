@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -64,7 +64,7 @@ print(pretty_print_snakemake(snakemake))
 phenotype_col = snakemake.wildcards["phenotype_col"]
 phenotype_col
 
-# %% {"tags": []}
+# %%
 covariates_df = (
     pl.scan_parquet(snakemake.input["covariates_pq"])
     .select([
@@ -74,7 +74,7 @@ covariates_df = (
 )
 covariates_df.schema
 
-# %% {"tags": []}
+# %%
 samples_df = covariates_df.collect().to_pandas()
 samples_df
 
@@ -88,7 +88,7 @@ is_boolean_phenotype
 # %%
 import sklearn.model_selection
 
-# %% {"tags": []}
+# %%
 snakemake.params
 
 # %%

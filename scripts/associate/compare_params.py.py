@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -46,7 +46,7 @@ setup_plot_style()
 # %matplotlib inline
 # %config InlineBackend.figure_format='retina'
 
-# %% {"tags": []}
+# %%
 from rep.notebook_init import init_spark
 spark = init_spark(enable_glow=False)
 
@@ -96,7 +96,7 @@ if "plot_dpi" in snakemake.params:
 else:
     DPI=450
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # # read features
 
 # %%
@@ -114,7 +114,7 @@ phenotype_col
 phenocode = config["covariates"]["phenocode"]
 phenocode
 
-# %% [markdown] {"tags": []}
+# %% [markdown]
 # ## read association results
 
 # %%

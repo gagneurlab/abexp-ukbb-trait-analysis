@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.0
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python [conda env:anaconda-florian4]
 #     language: python
@@ -68,7 +68,7 @@ import pyspark.sql.functions as f
 
 # import glow
 
-# %% {"tags": []}
+# %%
 from rep.notebook_init import init_spark
 spark = init_spark(enable_glow=False)
 
