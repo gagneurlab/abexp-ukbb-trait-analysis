@@ -1,7 +1,7 @@
 ---
 phenotypes:
 # - "Asthma"
-- "BodyMassIndex"
+# - "BodyMassIndex"
 # - "CAD_HARD"
 # - "CAD_SOFT"
 - "c_reactive_protein"

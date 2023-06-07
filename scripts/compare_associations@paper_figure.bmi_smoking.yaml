@@ -71,8 +71,8 @@ phenotypes:
 covariates:
 # - "sex_age_genPC"
 # - "sex_age_genPC_CLMP"
-- "sex_age_genPC_CLMP_PRS"
-# - "sex_age_genPC_BMI_smoking_CLMP_PRS"
+# - "sex_age_genPC_CLMP_PRS"
+- "sex_age_genPC_BMI_smoking_CLMP_PRS"
 # - "randomized_sex_age_genPC_CLMP_PRS"
 
 features_sets:
