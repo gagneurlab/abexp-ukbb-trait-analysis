@@ -6,7 +6,7 @@
 #       extension: .R
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.10.2
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: R [conda env:anaconda-drop2py]
 #     language: R
