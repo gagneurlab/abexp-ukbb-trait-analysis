@@ -99,7 +99,7 @@ plot_df
 # %%
 plot_df$ratio = plot_df$AbExp_all_tissues / plot_df$LOFTEE_pLoF
 plot_df$significant = (plot_df$ratio >= 2) | (plot_df$ratio <= 0.5)
-plot_df$phenotype = ifelse(plot_df$significant, plot_df$phenotype_col, "")
+# plot_df$phenotype = ifelse(plot_df$significant, plot_df$phenotype_col, "")
 plot_df
 
 # %%
@@ -115,7 +115,7 @@ plot_df$phenotype_col
 traits_to_show = c(
     # "LDL direct",
     #"Albumin",
-    #"Alkaline\nphosphatase",
+    "Alkaline\nphosphatase",
     # "Aspartate\naminotransferase",
     # "Basophill\ncount",
     # "Phosphate",
@@ -145,8 +145,8 @@ plot_1 = (
         x="Genes discovered by LOFTEE pLoF",
         y=" \nGenes discovered by AbExp"
     )
-    + scale_x_continuous(limits = c(0, 30))
-    + scale_y_continuous(limits = c(0, 30))
+    #+ scale_x_continuous(limits = c(0, 30))
+    #+ scale_y_continuous(limits = c(0, 30))
     + theme(
         # figure.size=c(6, 4),
         axis.text.x=element_text(
@@ -166,14 +166,16 @@ plot_1 = (
         aes(label=`phenotype_col`)
     )
     # + facet_wrap("covariates")
-    + coord_equal()
+    # + coord_equal()
     + THEME
 )
 
 plot_1
 
 # %%
-plot_1 + geom_text_repel(aes(label=`phenotype_col`))
+options(repr.plot.width=20, repr.plot.height=15)
+
+plot_1 + geom_text_repel(aes(label=`phenotype_col`), max.overlaps=50)
 
 # %%
 path = paste0(snakemake@params$output_basedir, "/num_significants")
@@ -296,7 +298,7 @@ plot_3 <- (
     # + coord_fixed()
     + labs(
         x="Prediction based on common variants and AbExp",
-        y=paste0("'", phenotype_col, "'\nmeasurement"),
+        y=paste0("'", phenotype_col, "'\nnormalized measurement"),
         title=paste0("Predictions for '", phenotype_col, "' of\ncommon-variant model vs. AbExp-DNA model")
     )
     + THEME
@@ -569,8 +571,8 @@ rhs
 # %%
 commonplot <- ggarrange(
   ncol = 2, nrow = 1, widths = c(1,2),
-  ggarrange(nrow = 2, ncol = 1, heights= c(1,2), labels = c('a', 'b'), legend="bottom", align="v",
-            plot_1 + ggtitle(NULL),
+  ggarrange(nrow = 2, ncol = 1, heights= c(1.1, 2), labels = c('a', 'b'), legend="bottom", align="v",
+            plot_1 + ggtitle(NULL) + coord_fixed(ratio=1/2.5),
             rhs
   ),
   ggarrange(labels=c("c"),
@@ -595,7 +597,5 @@ ggsave(paste0(path, ".svg"), commonplot, width = 16, height = 12, dpi=600, devic
 ggsave(paste0(path, ".pdf"), commonplot, width = 16, height = 12, dpi=600, device=cairo_pdf)
 
 display_png(file=paste0(path, ".png"))
-
-# %%
 
 # %%

@@ -136,7 +136,8 @@ rule all:
         expand(rules.compare_associations.output, comparison=[
             # "all",
             "paper_figure",
-            "paper_figure_all_traits",
+            # "paper_figure_all_traits",
+            "bmi_smoking_best_tissue_test",
         ]),
         expand(rules.compare_risk_scores.output, comparison=[
             # "all",
