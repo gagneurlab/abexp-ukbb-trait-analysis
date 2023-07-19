@@ -24,8 +24,10 @@ dependencies:
 - matplotlib
 - polars
 - dask
-- pyranges
+- bioconda::pyranges
+- bioconda::snakemake
 - pip
 - pip:
   - matplotlib_venn
   - stringdb
+  - git+ssh://git@github.com/gagneurlab/rep.git
