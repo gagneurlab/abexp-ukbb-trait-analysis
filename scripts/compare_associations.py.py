@@ -53,12 +53,6 @@ setup_plot_style()
 # %config InlineBackend.figure_format='retina'
 
 # %%
-# import os
-# # os.environ["RAY_ADDRESS"] = os.environ.get("RAY_ADDRESS", 'ray://192.168.16.30:10001')
-# os.environ["RAY_ADDRESS"] = 'ray://192.168.16.28:10001'
-# os.environ["RAY_ADDRESS"]
-
-# %%
 from rep.notebook_init import init_spark
 spark = init_spark(enable_glow=False)
 
@@ -83,9 +77,7 @@ except NameError:
         rule_name = 'compare_associations',
         default_wildcards={
             # "comparison": "all",
-            # "comparison": "paper_figure",
-            # "comparison": "paper_figure_all_traits",
-            "comparison": "bmi_smoking_best_tissue_test",
+            "comparison": "paper_figure",
         }
     )
 

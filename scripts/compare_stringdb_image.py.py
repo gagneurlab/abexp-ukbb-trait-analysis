@@ -82,7 +82,7 @@ except NameError:
             # "feature_set": "max_AbExp",
             # "covariates": "sex_age_genPC",
             # "covariates": "sex_age_genPC_CLMP_PRS",
-            "covariates": "sex_age_genPC_BMI_smoking_CLMP_PRS",
+            "covariates": "sex_age_genPC_CLMP_PRS",
         }
     )
 
