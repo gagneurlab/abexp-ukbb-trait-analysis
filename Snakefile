@@ -33,6 +33,7 @@ UKBB_RAW_PHENOTYPES_DIR = config["ukbb_raw_phenotypes_dir"]
 UKBB_PROCESSED_PHENOTYPES_DIR = config["ukbb_processed_phenotypes_dir"]
 UKBB_DECODED_PHENOTYPES_DIR = config["ukbb_decoded_phenotypes_dir"]
 
+UKBB_SKIP_METADATA_UPDATE = bool(os.environ.get("UKBB_SKIP_METADATA_UPDATE", "false"))
 
 phenotype_dirs, ukbb_codes = glob_wildcards(UKBB_RAW_PHENOTYPES_DIR + "/{phenotype_dir}/{ukbb_code}.tab")
 
@@ -127,7 +128,7 @@ all_phenotypes_output = [
 rule all:
     input:
         expand(rules.read_phenotypes.output, zip, pheno_dir=phenotype_dirs, ukbb_code=ukbb_codes),
-        rules.merge_phenotype_metadata.output,
+        # rules.merge_phenotype_metadata.output,
         expand(rules.filter_genebass.output, genebass_version=["300k", "500k"]),
 #         rules.Index.output, 
         # *hdl_cholesterol,
