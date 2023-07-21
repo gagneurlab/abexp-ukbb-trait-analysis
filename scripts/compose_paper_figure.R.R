@@ -136,6 +136,10 @@ traits_to_show = c(
 print(traits_to_show)
 
 # %%
+max_n = max(plot_df$`LOFTEE_pLoF`, plot_df$`AbExp_all_tissues`)
+max_n
+
+# %%
 plot_1 = (
     ggplot(plot_df, aes(x=`LOFTEE_pLoF`, y=`AbExp_all_tissues`))
     + geom_point(size=3)
@@ -145,8 +149,8 @@ plot_1 = (
         x="Genes discovered by LOFTEE pLoF",
         y=" \nGenes discovered by AbExp"
     )
-    #+ scale_x_continuous(limits = c(0, 30))
-    #+ scale_y_continuous(limits = c(0, 30))
+    + scale_x_continuous(limits = c(0, max_n))
+    + scale_y_continuous(limits = c(0, max_n))
     + theme(
         # figure.size=c(6, 4),
         axis.text.x=element_text(
@@ -490,11 +494,58 @@ lower_lhs = (
         + scale_fill_manual(values=c("orange", "#619CFF"),labels=c(
                 `AbExp_all_tissues` = "AbExp",
                 `LOFTEE_pLoF` = "LOFTEE pLoF"
-    ))
+        ))
     )
     #+ ylab("proportional difference in r² between\n AbExp-DNA and LOFTEE pLoF")
     + plot_layout(widths = c(1, 1))
     & theme(plot.margin = margin(0,0,0,0))
+)
+lower_lhs
+
+# %%
+lower_lhs = ggarrange(
+    (
+        plot_4 
+        + ggtitle(NULL)
+        + xlab("")
+        + ylab("Relative increase in r² between\n AbExp and LOFTEE pLoF")
+        + theme(
+            # axis.title.y = element_blank(),
+            legend.position = "bottom"
+            # legend.title = element_text("Nr. of individuals")
+            # legend.title = element_blank(),
+        )
+    ), (
+        plot_5
+        # + facet_wrap("sd_cutoff_label")
+        + scale_fill_discrete(
+            name="",
+            labels=c(
+                `AbExp_all_tissues` = "AbExp-DNA",
+                `LOFTEE_pLoF` = "LOFTEE pLoF"
+            )
+        )
+        + ggtitle(NULL)
+        + ylab("Individuals with:\n◀-- increased error -- ┃ -- reduced error --▶")
+        + theme(
+            axis.text.y = element_blank(),
+            axis.title.y = element_blank(),
+            axis.ticks.y = element_blank(),
+            # legend.title = element_text("Nr. of individuals")
+            # legend.title = element_blank(),
+            legend.position = "bottom"
+        )
+        + scale_fill_manual(values=c("orange", "#619CFF"),labels=c(
+                `AbExp_all_tissues` = "AbExp",
+                `LOFTEE_pLoF` = "LOFTEE pLoF"
+        ))
+    ),
+    align="h",
+    labels=c("c", "d"),
+    widths=c(1.5, 1)
+    # #+ ylab("proportional difference in r² between\n AbExp-DNA and LOFTEE pLoF")
+    # + plot_layout(widths = c(1, 1))
+    # & theme(plot.margin = margin(0,0,0,0))
 )
 lower_lhs
 
@@ -508,10 +559,26 @@ ggsave(paste0(path, ".pdf"), lower_lhs, width = 10, height = 8, dpi=600, device=
 display_png(file=paste0(path, ".png"))
 
 # %%
-as_ggplot(cowplot::get_legend(
-    plot_2
-    + guides(fill="none")
-))
+# as_ggplot(cowplot::get_legend(
+#     plot_2
+#     + guides(fill="none")
+# ))
+
+# %%
+apply_consistent_x_lims <- function(this_plot){
+    num_plots <- length(this_plot$layers)
+    x_lims <- lapply(1:num_plots, function(x) ggplot_build(this_plot[[x]])$layout$panel_scales_x[[1]]$range$range)
+    min_x <- min(unlist(x_lims))
+    max_x <- max(unlist(x_lims))
+    this_plot & xlim(min_x, max_x)
+}
+apply_consistent_y_lims <- function(this_plot){
+    num_plots <- length(this_plot$layers)
+    y_lims <- lapply(1:num_plots, function(x) ggplot_build(this_plot[[x]])$layout$panel_scales_y[[1]]$range$range)
+    min_y <- min(unlist(y_lims))
+    max_y <- max(unlist(y_lims))
+    this_plot & ylim(min_y, max_y)
+}
 
 # %%
 rhs = (
@@ -529,7 +596,7 @@ rhs = (
             legend.position = c(0.22, 0.87),
             legend.background = element_rect(fill="#00000000"),
             axis.title.x = element_blank(),
-            axis.text.x = element_blank(),
+            # axis.text.x = element_blank(),
             # axis.ticks.x = element_blank()
         )
     )
@@ -553,8 +620,9 @@ rhs = (
         )
     )
     + plot_layout(nrow=2)
-    & theme(plot.margin = margin(0,0,0,0))
+    # & theme(plot.margin = margin(0,0,0,0))
 )
+rhs = apply_consistent_x_lims(rhs)
 rhs = (
     wrap_plots(rhs) / as_ggplot(cowplot::get_legend(
         plot_2
@@ -566,35 +634,47 @@ rhs = (
     ))
     + plot_layout(nrow=2, heights = c(15, 1))
 )
+
 rhs
 
 # %%
 commonplot <- ggarrange(
-  ncol = 2, nrow = 1, widths = c(1,2),
-  ggarrange(nrow = 2, ncol = 1, heights= c(1.1, 2), labels = c('a', 'b'), legend="bottom", align="v",
-            plot_1 + ggtitle(NULL) + coord_fixed(ratio=1/2.5),
+    ncol = 2, nrow = 1, widths = c(1,2),
+    ggarrange(nrow = 2, ncol = 1, heights= c(1, 2), labels = c('a', 'b'), legend="bottom", align="v",
+            plot_1 + ggtitle(NULL) + coord_fixed(ratio=1),
             rhs
-  ),
-  ggarrange(labels=c("c"),
-      lower_lhs
-  )
-  # ggarrange(nrow = 2, labels = c('b', 'c'), heights = c(1,1), common.legend = TRUE, legend="bottom", align = "h",
-  #           plot_2 + ggtitle("") + theme(
-  #               legend.margin = margin(6, 6, 6, 6)
-  #           ),
-  #           plot_3 + ggtitle("") + theme(
-  #               legend.margin = margin(6, 6, 6, 6)
-  #           )
-  # )
+    ),
+    ggarrange(
+        lower_lhs
+        + ggtitle(NULL)
+        + xlab("")
+        # + ylab("Relative increase in r² between\n AbExp and LOFTEE pLoF")
+        + theme(
+            # axis.title.y = element_blank(),
+            legend.position = "bottom"
+            # legend.title = element_text("Nr. of individuals")
+            # legend.title = element_blank(),
+        )
+    )
+    # ggarrange(nrow = 2, labels = c('b', 'c'), heights = c(1,1), common.legend = TRUE, legend="bottom", align = "h",
+    #           plot_2 + ggtitle("") + theme(
+    #               legend.margin = margin(6, 6, 6, 6)
+    #           ),
+    #           plot_3 + ggtitle("") + theme(
+    #               legend.margin = margin(6, 6, 6, 6)
+    #           )
+    # )
 )
 commonplot
 
 # %%
 path = paste0(snakemake@params$output_basedir, "/paper_figure")
 print(paste0("Saving to ", path, "..."))
-ggsave(paste0(path, ".png"), commonplot, width = 16, height = 12, dpi=600, type = "cairo")
-ggsave(paste0(path, ".svg"), commonplot, width = 16, height = 12, dpi=600, device=svg)
-ggsave(paste0(path, ".pdf"), commonplot, width = 16, height = 12, dpi=600, device=cairo_pdf)
+w=14
+h=14
+ggsave(paste0(path, ".png"), commonplot, width = w, height = h, dpi=600, type = "cairo")
+ggsave(paste0(path, ".svg"), commonplot, width = w, height = h, dpi=600, device=svg)
+ggsave(paste0(path, ".pdf"), commonplot, width = w, height = h, dpi=600, device=cairo_pdf)
 
 display_png(file=paste0(path, ".png"))
 
