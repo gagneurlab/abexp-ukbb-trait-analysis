@@ -45,6 +45,9 @@ from rep.notebook_init import setup_plot_style
 setup_plot_style()
 
 # %%
+import xml.etree.ElementTree as ET
+
+# %%
 # %matplotlib inline
 # %config InlineBackend.figure_format='retina'
 
@@ -181,8 +184,6 @@ display(SVG(svg_content))
 
 # %%
 def get_node_colors(svg):
-    import xml.etree.ElementTree as ET
-    
     retval = {}
     
     # Parse the SVG file
@@ -211,7 +212,6 @@ def get_point_on_circle(x, y, r, fraction=0.0):
     return (adj_x, adj_y)
 
 def set_color(node, node_colors, default='rgb(255,255,255)'):
-    import xml.etree.ElementTree as ET
     print(f"setting {node} to color(s) {node_colors}. Len: {len(node_colors)}")
     
     for circle in node.findall(".//{http://www.w3.org/2000/svg}circle"):
@@ -256,8 +256,6 @@ def set_color(node, node_colors, default='rgb(255,255,255)'):
 
 # %%
 def set_node_colors(svg, node_colors, default='rgb(255,255,255)', to_string=False):
-    import xml.etree.ElementTree as ET
-    
     # Parse the SVG file
     root = ET.fromstring(svg)
 
@@ -280,8 +278,6 @@ def set_node_colors(svg, node_colors, default='rgb(255,255,255)', to_string=Fals
 
 # %%
 def create_legend(group_colors):
-    import xml.etree.ElementTree as ET
-    
     g_legend = ET.fromstring(r"""<ns0:g xmlns:ns0="http://www.w3.org/2000/svg" id="legend"></ns0:g>""")
     for idx, (name, color) in enumerate(group_colors.items()):
             rect_w = 30
