@@ -1780,7 +1780,7 @@ for feature_name, path in config["feature_sets"].items():
 len(feature_dfs)
 
 # %%
-from rep.data import join_featuresets
+from rep.spark_functions import join_featuresets
 
 # %%
 fill_values = config.get('fill_values')

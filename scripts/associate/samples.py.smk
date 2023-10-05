@@ -16,6 +16,7 @@ rule samples:
         samples_pq_done=touch(f"{COVARIATES_BASEPATH}/samples.parquet.done"),
     input:
         samples_txt=config["samples"],
+        blacklist_txt=config["blacklist_samples"],
         phenotype_metadata_pq=f"{UKBB_PROCESSED_PHENOTYPES_DIR}/latest.meta.parquet",
     params:
         nb_script=f"{SNAKEFILE_DIR}/{SCRIPT}",

@@ -84,7 +84,7 @@ cairosvg <- function(filename, width, height){
 options(repr.plot.width=12, repr.plot.height=8)
 
 # %%
-THEME = theme_bw(base_size=12, base_family = 'Helvetica')
+THEME = theme_bw(base_size=12, base_family = 'Helvetica') + theme(plot.tag = element_text(face = "bold"))
 
 # %% [markdown]
 # # subplots
@@ -142,7 +142,7 @@ max_n
 # %%
 plot_1 = (
     ggplot(plot_df, aes(x=`LOFTEE_pLoF`, y=`AbExp_all_tissues`))
-    + geom_point(size=3)
+    + geom_point(size=2)
     + geom_abline(slope=1, color="black", linetype="dashed")
     + labs(
         title="Number of significantly associating genes\n(p-values, alpha=0.05)",
@@ -172,6 +172,7 @@ plot_1 = (
     # + facet_wrap("covariates")
     # + coord_equal()
     + THEME
+    + labs(tag="a")
 )
 
 plot_1
@@ -367,7 +368,7 @@ plot_4 = (
     )
     + labs(
         x="phenotype",
-        y="relative increase in r² between 'AbExp' and 'LOFTEE pLoF'",
+        y="relative difference in r² between 'AbExp' and 'LOFTEE pLoF'",
         title="Comparison of phenotype prediction models using different feature sets",
     )
     + THEME
@@ -412,18 +413,27 @@ plot_df = plot_df[`sd_cutoff_label` %in% c("0.5 SD", "0.75 SD", "1.0 SD")]
 plot_df
 
 # %%
+dodge_width=0.9
 plot_5 = (
     ggplot(subset(plot_df, sd_cutoff == '1'), aes(x=reorder(`phenotype_col`, `reduce`), fill = `feature_set`, width=.8))
-    + geom_col(aes(y=-`increase`), position=position_dodge(width=0.8, preserve='single'), alpha=1)
-    + geom_col(aes(y=`reduce`), position=position_dodge(width=0.8, preserve='single'))
+    + geom_col(aes(y=-`increase`), position=position_dodge(width=dodge_width, preserve='single'), alpha=1)
+    + geom_col(aes(y=`reduce`), position=position_dodge(width=dodge_width, preserve='single'))
     # + geom_col(aes(y="-increase"), position=positions.position_dodge(preserve='single'), alpha=0.5)
     # + geom_col(aes(y="reduce"), position=positions.position_dodge(preserve='single'))
     + geom_hline(aes(yintercept = 0))
     + scale_x_discrete(breaks=phenotype_label_order)
-    + scale_fill_manual(values=c("orange", "#619CFF"),labels=c(
-                `AbExp_all_tissues` = "AbExp",
-                `LOFTEE_pLoF` = "LOFTEE pLoF"
-    ))
+    + scale_fill_manual(
+        labels=c(
+            `AbExp_all_tissues` = "AbExp",
+            `LOFTEE_pLoF` = "LOFTEE"
+        ),
+        # values=c("orange", "#619CFF"),
+        values=c(
+            `AbExp_all_tissues` = "#48a462",
+            `LOFTEE_pLoF` = "#999999"
+            # `LOFTEE_pLoF` = "#619CFF"
+        ),
+    )
     + theme(
         # figure_size=(8, 8),
     )
@@ -474,13 +484,6 @@ lower_lhs = (
     + (
         plot_5
         # + facet_wrap("sd_cutoff_label")
-        + scale_fill_discrete(
-            name="",
-            labels=c(
-                `AbExp_all_tissues` = "AbExp-DNA",
-                `LOFTEE_pLoF` = "LOFTEE pLoF"
-            )
-        )
         + ggtitle(NULL)
         + ylab("Individuals with:\n◀-- increased error -- ┃ -- reduced error --▶")
         + theme(
@@ -491,10 +494,6 @@ lower_lhs = (
             # legend.title = element_blank(),
             legend.position = "bottom"
         )
-        + scale_fill_manual(values=c("orange", "#619CFF"),labels=c(
-                `AbExp_all_tissues` = "AbExp",
-                `LOFTEE_pLoF` = "LOFTEE pLoF"
-        ))
     )
     #+ ylab("proportional difference in r² between\n AbExp-DNA and LOFTEE pLoF")
     + plot_layout(widths = c(1, 1))
@@ -515,34 +514,37 @@ lower_lhs = ggarrange(
             # legend.title = element_text("Nr. of individuals")
             # legend.title = element_blank(),
         )
+        + labs(tag = "d")
     ), (
         plot_5
         # + facet_wrap("sd_cutoff_label")
-        + scale_fill_discrete(
-            name="",
-            labels=c(
-                `AbExp_all_tissues` = "AbExp-DNA",
-                `LOFTEE_pLoF` = "LOFTEE pLoF"
-            )
-        )
+        # + scale_fill_discrete(
+        #     name="",
+        #     labels=c(
+        #         `AbExp_all_tissues` = "AbExp-DNA",
+        #         `LOFTEE_pLoF` = "LOFTEE pLoF"
+        #     )
+        # )
         + ggtitle(NULL)
-        + ylab("Individuals with:\n◀-- increased error -- ┃ -- reduced error --▶")
+        + ylab("Individuals with changed error:\n◀ increased ┃ reduced ▶")
+        # + ylab("Individuals with:\n◀-- increased error -- ┃ -- reduced error --▶")
         + theme(
             axis.text.y = element_blank(),
             axis.title.y = element_blank(),
             axis.ticks.y = element_blank(),
             # legend.title = element_text("Nr. of individuals")
-            # legend.title = element_blank(),
+            legend.title = element_blank(),
             legend.position = "bottom"
         )
-        + scale_fill_manual(values=c("orange", "#619CFF"),labels=c(
-                `AbExp_all_tissues` = "AbExp",
-                `LOFTEE_pLoF` = "LOFTEE pLoF"
-        ))
+        # + scale_fill_manual(values=c("orange", "#619CFF"),labels=c(
+        #         `AbExp_all_tissues` = "AbExp",
+        #         `LOFTEE_pLoF` = "LOFTEE pLoF"
+        # ))
+        + labs(tag = "e")
     ),
     align="h",
-    labels=c("c", "d"),
-    widths=c(1.5, 1)
+    # labels=c("c", "d"),
+    widths=c(1.7, 1)
     # #+ ylab("proportional difference in r² between\n AbExp-DNA and LOFTEE pLoF")
     # + plot_layout(widths = c(1, 1))
     # & theme(plot.margin = margin(0,0,0,0))
@@ -595,10 +597,11 @@ rhs = (
         + theme(
             legend.position = c(0.22, 0.87),
             legend.background = element_rect(fill="#00000000"),
-            axis.title.x = element_blank(),
+            # axis.title.x = element_blank(),
             # axis.text.x = element_blank(),
             # axis.ticks.x = element_blank()
         )
+        + labs(tag = "b")
     )
     # / plot_spacer()
     / (
@@ -618,6 +621,7 @@ rhs = (
             # legend.title = element_text("Nr. of individuals")
             # legend.title = element_blank(),
         )
+        + labs(tag = "c")
     )
     + plot_layout(nrow=2)
     # & theme(plot.margin = margin(0,0,0,0))
@@ -639,9 +643,14 @@ rhs
 
 # %%
 commonplot <- ggarrange(
-    ncol = 2, nrow = 1, widths = c(1,2),
-    ggarrange(nrow = 2, ncol = 1, heights= c(1, 2), labels = c('a', 'b'), legend="bottom", align="v",
-            plot_1 + ggtitle(NULL) + coord_fixed(ratio=1),
+    ncol = 2, nrow = 1, widths = c(1.1,2),
+    ggarrange(nrow = 2, ncol = 1, heights= c(1, 2), legend="bottom", align="v",
+            (
+                plot_1
+                + ggtitle(NULL)
+                + coord_fixed(ratio=1)
+                + labs(tag = "a")
+            ),
             rhs
     ),
     ggarrange(
@@ -670,8 +679,8 @@ commonplot
 # %%
 path = paste0(snakemake@params$output_basedir, "/paper_figure")
 print(paste0("Saving to ", path, "..."))
-w=14
-h=14
+w=11.5
+h=12
 ggsave(paste0(path, ".png"), commonplot, width = w, height = h, dpi=600, type = "cairo")
 ggsave(paste0(path, ".svg"), commonplot, width = w, height = h, dpi=600, device=svg)
 ggsave(paste0(path, ".pdf"), commonplot, width = w, height = h, dpi=600, device=cairo_pdf)

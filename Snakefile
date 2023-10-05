@@ -10,7 +10,7 @@ import pathlib
 include: 'snakefile_utils.smk'
 
 workdir: "./"
-configfile: "config_v7.yaml"
+configfile: "config_v8.yaml"
 
 # sync config directory
 eprint("Syncing config directory...")

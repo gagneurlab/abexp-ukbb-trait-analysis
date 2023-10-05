@@ -69,8 +69,16 @@ phenotype_col
 samples = pd.read_csv(snakemake.input["samples_txt"], header=None, names=["individual"], dtype={"individual": "string"})
 samples
 
+# %%
+blacklist_samples = pd.read_csv(snakemake.input["blacklist_txt"], header=None, names=["individual"], dtype={"individual": "string"})
+blacklist_samples
+
 # %% [markdown]
 # # filter samples
+
+# %%
+samples = samples.iloc[~ samples["individual"].isin(blacklist_samples["individual"]).values]
+samples
 
 # %% [markdown]
 # ## load annotations
@@ -126,7 +134,7 @@ data_df = (
     .with_columns([
         (
             pl.concat_list(genetic_relatedness_pairing_cols)
-            .arr.eval(pl.element().drop_nulls())
+            .list.eval(pl.element().drop_nulls())
             .alias("genetic_relatedness_pairing")
         ),
     ])
@@ -145,7 +153,7 @@ data_df
 # %%
 filtered_data_df = (
     data_df
-    .filter(pl.col("genetic_relatedness_pairing").arr.lengths() == 0)
+    .filter(pl.col("genetic_relatedness_pairing").list.lengths() == 0)
     .filter(pl.col("genetic_ethnic_grouping_f22006_0_0") == pl.lit("Caucasian"))
 )
 filtered_data_df
