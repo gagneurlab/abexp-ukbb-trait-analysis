@@ -14,7 +14,7 @@ CAD_HARD,PGS001839,"/s/project/uk_biobank/processed/risk_scores/PGS001839/PGS001
 CAD_SOFT,PGS001839,"/s/project/uk_biobank/processed/risk_scores/PGS001839/PGS001839.sscore","/s/project/uk_biobank/processed/clumping/411.4/GWAS_variants_clumped_mac.parquet","CAD_custom"
 glycated_haemoglobin_hba1c,PGS001953,"/s/project/uk_biobank/processed/risk_scores/PGS001953/PGS001953.sscore","/s/project/uk_biobank/processed/clumping/30750/GWAS_variants_clumped_mac.parquet","30750"
 Lipoprotein_A,PGS001963,"/s/project/uk_biobank/processed/risk_scores/PGS001963/PGS001963.sscore","/s/project/uk_biobank/processed/clumping/30790/GWAS_variants_clumped_mac.parquet","30790"
-Albumin,PGS001886,"/s/project/uk_biobank/processed/risk_scores/PGS001886/PGS001886.sscore","/s/project/uk_biobank/processed/clumping/30790/GWAS_variants_clumped_mac.parquet","30790"
+Albumin,PGS001886,"/s/project/uk_biobank/processed/risk_scores/PGS001886/PGS001886.sscore","/s/project/uk_biobank/processed/clumping/30600/GWAS_variants_clumped_mac.parquet","30600"
 Alkaline_phosphatase,PGS001939,"/s/project/uk_biobank/processed/risk_scores/PGS001939/PGS001939.sscore","/s/project/uk_biobank/processed/clumping/30610/GWAS_variants_clumped_mac.parquet","30610"
 Alanine_aminotransferase,PGS001940,"/s/project/uk_biobank/processed/risk_scores/PGS001940/PGS001940.sscore","/s/project/uk_biobank/processed/clumping/30620/GWAS_variants_clumped_mac.parquet","30620"
 Apolipoprotein_A,PGS001888,"/s/project/uk_biobank/processed/risk_scores/PGS001888/PGS001888.sscore","/s/project/uk_biobank/processed/clumping/30630/GWAS_variants_clumped_mac.parquet","30630"
