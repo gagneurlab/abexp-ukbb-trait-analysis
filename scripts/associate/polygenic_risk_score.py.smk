@@ -7,7 +7,7 @@ SCRIPT=os.path.basename(SNAKEFILE)[:-4]
 COVARIATES_BASEPATH=f'''{config["trait_associations"]}/cov={{covariates}}'''
 ASSOCIATION_BASEPATH=f'''{COVARIATES_BASEPATH}/fset={{feature_set}}'''
 
-OUTPUT_BASEPATH=f'''{config["trait_associations"]}/cov={{covariates}}/fset={{feature_set}}/polygenic_risk_score'''
+OUTPUT_BASEPATH=f'''{config["trait_associations"]}/cov={{covariates}}/fset={{feature_set}}/type={{model_type}}/polygenic_risk_score'''
 
 
 rule associate__polygenic_risk_score:

@@ -99,7 +99,7 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__polygenic_risk_score',
         default_wildcards={
-            "phenotype_col": "c_reactive_protein",
+            "phenotype_col": "HDL_cholesterol",
             # "phenotype_col": "standing_height",
             # "phenotype_col": "glycated_haemoglobin_hba1c",
             # "phenotype_col": "Lipoprotein_A",
@@ -114,6 +114,7 @@ except NameError:
             "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex_age_genPC_CLMP",
             # "covariates": "sex_age_genPC",
+            "model_type": "lightgbm" #\in ['lightgbm', 'linear']. Defaults to lightgbm for any other value
         }
     )
 
@@ -494,6 +495,9 @@ cv_split.get_n_splits()
 full_variables
 
 # %%
+snakemake.wildcards["model_type"]
+
+# %%
 cv_pred_dfs = []
 for fold, (train_fold_index, test_fold_index) in enumerate(cv_split.split()):
     print(f"training fold {fold}...")
@@ -502,17 +506,17 @@ for fold, (train_fold_index, test_fold_index) in enumerate(cv_split.split()):
     X_fold_test = train_df.iloc[test_fold_index][full_variables]
     # y_fold_test = train_df.iloc[test_fold_index][phenotype_col]
     
-    gbm_full = lgb.LGBMRegressor()
-    gbm_full.fit(X_fold_train[full_variables], y_fold_train)
-    full_pred_test = gbm_full.predict(X_fold_test)
+    model_full = sklearn.linear_model.LinearRegression() if snakemake.wildcards["model_type"]=="linear" else lgb.LGBMRegressor()
+    model_full.fit(X_fold_train[full_variables], y_fold_train)
+    full_pred_test = model_full.predict(X_fold_test)
     
-    gbm_restricted = lgb.LGBMRegressor()
-    gbm_restricted.fit(X_fold_train[restricted_variables], y_fold_train)
-    restricted_pred_test = gbm_restricted.predict(X_fold_test[restricted_variables])
+    model_restricted = sklearn.linear_model.LinearRegression() if snakemake.wildcards["model_type"]=="linear" else lgb.LGBMRegressor()
+    model_restricted.fit(X_fold_train[restricted_variables], y_fold_train)
+    restricted_pred_test = model_restricted.predict(X_fold_test[restricted_variables])
     
-    gbm_basic = lgb.LGBMRegressor()
-    gbm_basic.fit(X_fold_train[basic_variables], y_fold_train)
-    basic_pred_test = gbm_basic.predict(X_fold_test[basic_variables])
+    model_basic = sklearn.linear_model.LinearRegression() if snakemake.wildcards["model_type"]=="linear" else lgb.LGBMRegressor()
+    model_basic.fit(X_fold_train[basic_variables], y_fold_train)
+    basic_pred_test = model_basic.predict(X_fold_test[basic_variables])
     
     res = train_df.iloc[test_fold_index][["individual", "fold", phenotype_col]].assign(**{
         "full_model_pred": full_pred_test,
@@ -520,6 +524,9 @@ for fold, (train_fold_index, test_fold_index) in enumerate(cv_split.split()):
         "basic_model_pred": basic_pred_test,
     })
     cv_pred_dfs.append(res)
+
+# %%
+snakemake.wildcards
 
 # %%
 cv_pred_df = (
