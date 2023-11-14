@@ -70,6 +70,7 @@ library(ggtext)
 library(patchwork)
 library(grid)
 library(gridExtra)
+library(dplyr)
 
 # %%
 # CairoSVG function for ggplot2 -------------------------------------------
@@ -109,6 +110,18 @@ plot_df[order(`ratio`, decreasing = TRUE)]
 plot_df[`LOFTEE_pLoF` > `AbExp_all_tissues`]
 
 # %%
+plot_df[`LOFTEE_pLoF` < `AbExp_all_tissues`]
+
+# %%
+sum(plot_df[,`LOFTEE_pLoF`])
+
+# %%
+sum(plot_df[,`AbExp_all_tissues`])
+
+# %%
+sum(plot_df[,`AbExp_all_tissues`]) / sum(plot_df[,`LOFTEE_pLoF`])
+
+# %%
 plot_df$phenotype_col
 
 # %%
@@ -146,8 +159,8 @@ plot_1 = (
     + geom_abline(slope=1, color="black", linetype="dashed")
     + labs(
         title="Number of significantly associating genes\n(p-values, alpha=0.05)",
-        x="Genes discovered by LOFTEE pLoF",
-        y=" \nGenes discovered by AbExp"
+        x="Genes discovered by LOFTEE",
+        y=" \nGenes discovered by AbExp-DNA"
     )
     + scale_x_continuous(limits = c(0, max_n))
     + scale_y_continuous(limits = c(0, max_n))
@@ -183,10 +196,13 @@ options(repr.plot.width=20, repr.plot.height=15)
 plot_1 + geom_text_repel(aes(label=`phenotype_col`), max.overlaps=50)
 
 # %%
+w=4
+h=4
 path = paste0(snakemake@params$output_basedir, "/num_significants")
 print(paste0("Saving to ", path, "..."))
-ggsave(paste0(path, ".png"), plot_1, width = 8, height = 6, dpi=600, type = "cairo")
-ggsave(paste0(path, ".pdf"), plot_1, width = 8, height = 6, dpi=600, device=cairo_pdf)
+ggsave(paste0(path, ".png"), plot_1, width = w, height = h, dpi=600, type = "cairo")
+ggsave(paste0(path, ".svg"), plot_1, width = w, height = h, dpi=600, device=svg)
+ggsave(paste0(path, ".pdf"), plot_1, width = w, height = h, dpi=600, device=cairo_pdf)
 
 display_png(file=paste0(path, ".png"))
 
@@ -251,9 +267,9 @@ plot_2 <- (
     )
     + coord_fixed()
     + labs(
-        x="Prediction based on common variants and AbExp",
-        y="Prediction based on common variants",
-        title=paste0("Predictions for '", phenotype_col, "' of\ncommon-variant model vs. AbExp-DNA model")
+        x="Prediction based on\ncommon variants and AbExp-DNA",
+        y="Prediction based on\ncommon variants",
+        title=paste0(phenotype_col, " level")
     )
     + THEME
     + theme(plot.title = element_text(hjust = 0.5))
@@ -276,7 +292,7 @@ snakemake@params$alanine_aminotransferase_dir
 
 # %%
 plot_df = as.data.table(read_parquet(paste0(snakemake@params$alanine_aminotransferase_dir, "/predictions_cloud.parquet")))
-plot_df = plot_df[`variable` == 'Age+Sex+PC+PRS+AbExp_all_tissues \n r²=0.300']
+plot_df = plot_df[`variable` == 'Age+Sex+PC+PRS+AbExp_all_tissues \n r²=0.295']
 plot_df
 
 # %%
@@ -302,9 +318,9 @@ plot_3 <- (
     )
     # + coord_fixed()
     + labs(
-        x="Prediction based on common variants and AbExp",
-        y=paste0("'", phenotype_col, "'\nnormalized measurement"),
-        title=paste0("Predictions for '", phenotype_col, "' of\ncommon-variant model vs. AbExp-DNA model")
+        x="Prediction based on\ncommon variants and AbExp-DNA",
+        y=paste0("Measurement"),
+        title=paste0(phenotype_col, " level")
     )
     + THEME
     + theme(plot.title = element_text(hjust = 0.5))
@@ -368,7 +384,7 @@ plot_4 = (
     )
     + labs(
         x="phenotype",
-        y="relative difference in r² between 'AbExp' and 'LOFTEE pLoF'",
+        y="relative difference in R² between 'AbExp' and 'LOFTEE pLoF'",
         title="Comparison of phenotype prediction models using different feature sets",
     )
     + THEME
@@ -411,6 +427,9 @@ snakemake@params$compare_risk_scores_dir
 plot_df = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_dir, "/num_individuals_with_changed_abserr.diverging_barplot.parquet")))
 plot_df = plot_df[`sd_cutoff_label` %in% c("0.5 SD", "0.75 SD", "1.0 SD")]
 plot_df
+
+# %%
+plot_df[,.(`error_increase` = sum(`increase`), `error_reduce` = sum(`reduce`)), by=c("feature_set", "sd_cutoff", "sd_cutoff_label")]
 
 # %%
 dodge_width=0.9
@@ -507,7 +526,7 @@ lower_lhs = ggarrange(
         plot_4 
         + ggtitle(NULL)
         + xlab("")
-        + ylab("Relative increase in r² between\n AbExp and LOFTEE pLoF")
+        + ylab("Relative increase in R² between\n AbExp-DNA and LOFTEE")
         + theme(
             # axis.title.y = element_blank(),
             legend.position = "bottom"
@@ -561,6 +580,19 @@ ggsave(paste0(path, ".pdf"), lower_lhs, width = 10, height = 8, dpi=600, device=
 display_png(file=paste0(path, ".png"))
 
 # %%
+w=8
+h=8
+
+path = paste0(snakemake@params$output_basedir, "/combined_r2_num_indiv.shallow")
+print(paste0("Saving to ", path, "..."))
+ggsave(paste0(path, ".png"), lower_lhs, width = w, height = h, dpi=600, type = "cairo")
+ggsave(paste0(path, ".svg"), lower_lhs, width = w, height = h, dpi=600, device=svg)
+ggsave(paste0(path, ".pdf"), lower_lhs, width = w, height = h, dpi=600, device=cairo_pdf)
+
+# display_pdf(file=paste0(path, ".pdf"))
+display_png(file=paste0(path, ".png"))
+
+# %%
 # as_ggplot(cowplot::get_legend(
 #     plot_2
 #     + guides(fill="none")
@@ -586,7 +618,7 @@ apply_consistent_y_lims <- function(this_plot){
 rhs = (
     (
         plot_2
-        + ggtitle(NULL)
+        # + ggtitle(NULL)
         + guides(
             color="none",
             fill=guide_colourbar(
@@ -606,7 +638,7 @@ rhs = (
     # / plot_spacer()
     / (
         plot_3
-        + ggtitle(NULL)
+        # + ggtitle(NULL)
         + guides(
             color="none",
             fill=guide_colourbar(
@@ -642,9 +674,20 @@ rhs = (
 rhs
 
 # %%
+w=4
+h=8
+path = paste0(snakemake@params$output_basedir, "/alanine_aminotransferase")
+print(paste0("Saving to ", path, "..."))
+ggsave(paste0(path, ".png"), rhs, width = w, height = h, dpi=600, type = "cairo")
+ggsave(paste0(path, ".svg"), rhs, width = w, height = h, dpi=600, device=svg)
+ggsave(paste0(path, ".pdf"), rhs, width = w, height = h, dpi=600, device=cairo_pdf)
+
+display_png(file=paste0(path, ".png"))
+
+# %%
 commonplot <- ggarrange(
     ncol = 2, nrow = 1, widths = c(1.1,2),
-    ggarrange(nrow = 2, ncol = 1, heights= c(1, 2), legend="bottom", align="v",
+    ggarrange(nrow = 2, ncol = 1, heights= c(1, 2.4), legend="bottom", align="v",
             (
                 plot_1
                 + ggtitle(NULL)
@@ -686,5 +729,161 @@ ggsave(paste0(path, ".svg"), commonplot, width = w, height = h, dpi=600, device=
 ggsave(paste0(path, ".pdf"), commonplot, width = w, height = h, dpi=600, device=cairo_pdf)
 
 display_png(file=paste0(path, ".png"))
+
+# %% [markdown]
+# # number of significant genes for AbExp aggregations
+
+# %%
+rename_models = c(
+    `LOFTEE_pLoF` = "LOFTEE",
+    `AbExp_all_tissues` = "AbExp-DNA all tissues",
+    `max_AbExp` = "Minimum AbExp-DNA",
+    `median_AbExp` = "Median AbExp-DNA"
+)
+
+# %%
+plot_df = as.data.table(read_parquet(paste0(snakemake@params$compare_associations_dir, "/num_significants.scatter_plot.parquet")))
+plot_df
+
+# %%
+plot_df$ratio = plot_df$AbExp_all_tissues / plot_df$LOFTEE_pLoF
+plot_df$significant = (plot_df$ratio >= 2) | (plot_df$ratio <= 0.5)
+# plot_df$phenotype = ifelse(plot_df$significant, plot_df$phenotype_col, "")
+plot_df
+
+# %%
+traits_to_show = c(
+    # "LDL direct",
+    #"Albumin",
+    "Alkaline\nphosphatase",
+    # "Aspartate\naminotransferase",
+    # "Basophill\ncount",
+    # "Phosphate",
+    # "IGF1",
+    # "Testosterone",
+    # "Aspartate\naminotransferase",
+    # "Direct\nbilirubin",
+    # "SHBG",
+    # "Urate",
+    "HDL\ncholesterol",
+    'Mean sphered\ncell volume',
+    "Triglycerides",
+    #"Alanine\naminotransferase",
+    #"Apolipoprotein\nA",
+    # "c reactive\nprotein"
+    ""
+)
+print(traits_to_show)
+
+# %%
+max_n = max(plot_df$`max_AbExp`, plot_df$`median_AbExp`, plot_df$`AbExp_all_tissues`)
+max_n
+
+# %%
+melted_plot_df = melt(
+    plot_df,
+    id.vars=c("phenotype_col", "covariates"),
+    measure.vars=c("max_AbExp", "median_AbExp")
+)
+melted_plot_df = merge(
+    melted_plot_df,
+    plot_df[,.(`phenotype_col`, `covariates`, `AbExp_all_tissues`)],
+    on=c("phenotype_col", "covariates"),
+    how="outer"
+)
+melted_plot_df[, variable:=recode(melted_plot_df$variable, `max_AbExp` = "Minimum", `median_AbExp` = "Median")]
+melted_plot_df
+
+# %%
+plot = (
+    ggplot(melted_plot_df, aes(x=`AbExp_all_tissues`, y=`value`, color=`phenotype_col`))
+    + geom_point(size=2)
+    + geom_abline(slope=1, color="black", linetype="dashed")
+    + labs(
+        # title="Number of significantly associating genes\n(p-values, alpha=0.05)",
+        y="Genes discovered by AbExp aggregated across tissues",
+        x="Genes discovered by AbExp using all tissues"
+    )
+    + scale_x_continuous(limits = c(0, max_n))
+    + scale_y_continuous(limits = c(0, max_n))
+    # + geom_text_repel(
+    #     # data = plot_df[(significant == TRUE)], 
+    #     data = plot_df[(`phenotype_col` %in% traits_to_show)],
+    #     min.segment.length = 0,
+    #     point.size = 5,
+    #     aes(label=`phenotype_col`)
+    # )
+    # + facet_wrap("covariates")
+    # + coord_equal()
+    + coord_flip()
+    + facet_wrap("variable", nrow=1)
+    + THEME
+    + theme(
+        legend.position="bottom",
+        legend.title = element_blank()
+    )
+    # + labs(tag="a")
+)
+
+plot
+
+# %%
+w=8
+h=8
+path = paste0(snakemake@params$output_basedir, "/num_significants_on_aggregates")
+print(paste0("Saving to ", path, "..."))
+ggsave(paste0(path, ".png"), plot, width = w, height = h, dpi=600, type = "cairo")
+ggsave(paste0(path, ".pdf"), plot, width = w, height = h, dpi=600, device=cairo_pdf)
+ggsave(paste0(path, ".svg"), plot, width = w, height = h, dpi=600, device=svg)
+
+display_png(file=paste0(path, ".png"))
+
+# %% [markdown]
+# # QQ-Plot
+
+# %%
+combined_qqplot_df = as.data.table(read_parquet(paste0(snakemake@input$`combined_qqplot_pq`)))
+combined_qqplot_df
+
+# %%
+plot_df = combined_qqplot_df[`subsample` & `covariates` == 'randomized_sex_age_genPC_CLMP_PRS']
+plot_df$model = recode(factor(plot_df$feature_set, levels=names(rename_models)), !!!rename_models)
+plot_df
+
+# %%
+qq_plot = (
+    ggplot(plot_df, aes(x=`theoretical`, y=`sample`))
+    + geom_point()
+    + geom_abline(slope=1, linetype="dashed", color="red")
+    # + pn.scale_x_log10(limits=(10**-20, 1))
+    # + pn.scale_y_log10(limits=(10**-20, 1))
+    + labs(
+        # title="\n".join([
+        #     f"""Q-Q plot of randomized p-values vs. random uniform distribution""",
+        #     # f"""phenotype: '{snakemake.wildcards["phenotype_col"]}'""",
+        #     # f"""feature set: '{snakemake.wildcards["feature_set"]}'""",
+        #     # f"""covariates: '{snakemake.wildcards["covariates"]}'""",
+        # ]),
+        x="-log10(p) theoretical",
+        y="-log10(p) sample",
+    )
+    + facet_wrap("model", scales="free")
+    + THEME
+    + theme(
+        legend.position="bottom",
+        legend.title = element_blank()
+    )
+)
+qq_plot
+
+# %%
+w=8
+h=8
+path = paste0(snakemake@params$output_basedir, "/qq_plot")
+print(paste0("Saving to ", path, "..."))
+ggsave(paste0(path, ".png"), qq_plot, width = w, height = h, dpi=600, type = "cairo")
+display_png(file=paste0(path, ".png"))
+ggsave(paste0(path, ".pdf"), qq_plot, width = w, height = h, dpi=600, device=cairo_pdf)
+ggsave(paste0(path, ".svg"), qq_plot, width = w, height = h, dpi=600, device=svg)
 
 # %%

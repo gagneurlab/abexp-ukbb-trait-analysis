@@ -35,6 +35,7 @@ rule compose_paper_figure:
                 "feature_set": "AbExp_all_tissues",
                 "covariates": "sex_age_genPC_CLMP_PRS"
             }),
+            "combined_qqplot_pq": rules.compare_associations.output["qq_plot_pq"].format(comparison="paper_figure_randomized"),
         }
     params:
         compare_associations_dir=rules.compare_associations.params.output_basedir.format(comparison="paper_figure"),

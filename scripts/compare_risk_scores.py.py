@@ -349,6 +349,25 @@ unstacked_plot_restricted_df
 from scipy.stats import wilcoxon
 
 # %%
+import scipy.stats
+
+
+# %%
+def ttest(score_diff, cutoff=0.05):
+    cv = len(score_diff)
+    avg_diff = np.mean(score_diff)
+
+    numerator = avg_diff * np.sqrt(cv)
+    denominator = np.sqrt(
+        np.sum(np.square(score_diff - avg_diff)) / (cv - 1)
+    )
+    t_stat = numerator / denominator
+
+    pvalue = scipy.stats.t.sf(np.abs(t_stat), cv - 1) * 2.0
+    return float(t_stat), float(pvalue), float(pvalue) < cutoff
+
+
+# %%
 import itertools
 
 # list(itertools.combinations(keys, 2))
@@ -369,7 +388,8 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
         subset_plot_df
         .groupby(["phenotype_col", "covariates"]).apply(lambda df:
             # NormalDist(mu=df[f"difference_to_{feature_x}"].mean(), sigma=df[f"difference_to_{feature_x}"].std()).overlap(NormalDist(mu=0, sigma=df[f"difference_to_{feature_x}"].std()))
-            1 if np.all(df[feature_x] == df[feature_y]) else wilcoxon(df[feature_x], df[feature_y], alternative="two-sided").pvalue
+            # 1 if np.all(df[feature_x] == df[feature_y]) else scipy.stats.wilcoxon(df[feature_x], df[feature_y], alternative="two-sided").pvalue
+            1 if np.all(df[feature_x] == df[feature_y]) else ttest(df[feature_x] - df[feature_y])[1]
         )
         .to_frame(name="pval")
         .merge(subset_plot_df, on=["phenotype_col", "covariates"], how="right")
@@ -456,7 +476,8 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
         subset_plot_df
         .groupby(["phenotype_col", "covariates"]).apply(lambda df:
             # NormalDist(mu=df[f"difference_to_{feature_x}"].mean(), sigma=df[f"difference_to_{feature_x}"].std()).overlap(NormalDist(mu=0, sigma=df[f"difference_to_{feature_x}"].std()))
-            1 if np.all(df[feature_x] == df[feature_y]) else wilcoxon(df[feature_x], df[feature_y], alternative="two-sided").pvalue
+            # 1 if np.all(df[feature_x] == df[feature_y]) else scipy.stats.wilcoxon(df[feature_x], df[feature_y], alternative="two-sided").pvalue
+            1 if np.all(df[feature_x] == df[feature_y]) else ttest(df[feature_x] - df[feature_y])[1]
         )
         .to_frame(name="pval")
         .merge(subset_plot_df, on=["phenotype_col", "covariates"], how="right")

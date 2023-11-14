@@ -52,6 +52,9 @@ rule compare_associations:
         mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
     output:
         significant_genes_pq=directory(f"{OUTPUT_BASEPATH}/significant_genes.parquet"),
+        qq_plot_pq=f"{OUTPUT_BASEPATH}/qq_plot.parquet",
+        qq_plot_png=f"{OUTPUT_BASEPATH}/qq_plot.png",
+        qq_plot_pdf=f"{OUTPUT_BASEPATH}/qq_plot.pdf",
         touch_file=touch(f"{OUTPUT_BASEPATH}/done"),
     input: unpack(_compare_associations_input_fn)
     params:

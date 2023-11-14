@@ -77,7 +77,7 @@ except NameError:
         rule_name = 'compare_associations',
         default_wildcards={
             # "comparison": "all",
-            "comparison": "paper_figure",
+            "comparison": "paper_figure_randomized",
         }
     )
 
@@ -139,6 +139,76 @@ regression_results_df = (
 # regression_results_df = regression_results_df.assign(padj=np.fmin(regression_results_df["lr_pval"] * regression_results_df.shape[0], 1))
 
 regression_results_df.printSchema()
+
+# %% [markdown]
+# # Q-Q Plot
+
+# %%
+grouping = ["covariates", "feature_set"]
+
+# %%
+plot_df = regression_results_df.select(*grouping, f.col("lr_pval")).toPandas()
+
+# %%
+qq_df = (
+    plot_df
+    .dropna()
+    .groupby(grouping)
+    .apply(lambda df: (
+        df
+        .sort_values("lr_pval")
+        .assign(**{
+            "sample": -np.log10(np.sort(df["lr_pval"]).astype("float64")),
+            "theoretical": -np.log10(np.sort(np.arange(0, 1, step=1/df.shape[0], dtype="float64"))),
+        })
+    ))
+    .reset_index(drop=True)
+)
+qq_df
+
+# %%
+qq_df["subsample"] = (
+    ((qq_df["theoretical"] > 1) | np.repeat([[False] * 99 + [True]], repeats=np.ceil(qq_df.shape[0] / 100), axis=0).flatten()[:qq_df.shape[0]])
+    & ((qq_df["theoretical"] > 2) | np.repeat([[False] * 9 + [True]], repeats=np.ceil(qq_df.shape[0] / 10), axis=0).flatten()[:qq_df.shape[0]])
+)
+
+# %%
+qq_df[(qq_df["theoretical"] < 1)]
+
+# %%
+qq_df.to_parquet(snakemake.output['qq_plot_pq'])
+
+# %%
+plot = (
+    pn.ggplot(qq_df.query("subsample"), pn.aes(x="theoretical", y="sample"))
+    + pn.geom_abline(slope=1, linetype="dashed", color="red")
+    + pn.geom_point()
+    # + pn.scale_x_log10(limits=(10**-20, 1))
+    # + pn.scale_y_log10(limits=(10**-20, 1))
+    + pn.labs(
+        title="\n".join([
+            f"""Q-Q plot of randomized p-values vs. random uniform distribution""",
+            # f"""phenotype: '{snakemake.wildcards["phenotype_col"]}'""",
+            # f"""feature set: '{snakemake.wildcards["feature_set"]}'""",
+            # f"""covariates: '{snakemake.wildcards["covariates"]}'""",
+        ]),
+        x="-log10(p) theoretical",
+        y="-log10(p) sample",
+    )
+    + pn.facet_wrap(grouping, scales="free")
+    + pn.theme(title=pn.element_text(linespacing=1.4), figure_size=(12, 8))
+)
+display(plot)
+
+# %%
+snakemake.output
+
+# %%
+pn.ggsave(plot, snakemake.output['qq_plot_pdf'], dpi=DPI)
+pn.ggsave(plot, snakemake.output['qq_plot_png'], dpi=DPI)
+
+# %% [markdown]
+# # significant associations
 
 # %%
 grouping = ["phenotype_col", "covariates", "feature_set"]
