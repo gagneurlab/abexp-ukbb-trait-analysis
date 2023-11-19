@@ -71,6 +71,7 @@ library(patchwork)
 library(grid)
 library(gridExtra)
 library(dplyr)
+library(stringr)
 
 # %%
 # CairoSVG function for ggplot2 -------------------------------------------
@@ -159,8 +160,8 @@ plot_1 = (
     + geom_abline(slope=1, color="black", linetype="dashed")
     + labs(
         title="Number of significantly associating genes\n(p-values, alpha=0.05)",
-        x="Genes discovered by LOFTEE",
-        y=" \nGenes discovered by AbExp-DNA"
+        x="Genes discovered using LOFTEE",
+        y=" \nGenes discovered using AbExp"
     )
     + scale_x_continuous(limits = c(0, max_n))
     + scale_y_continuous(limits = c(0, max_n))
@@ -267,7 +268,7 @@ plot_2 <- (
     )
     + coord_fixed()
     + labs(
-        x="Prediction based on\ncommon variants and AbExp-DNA",
+        x="Prediction based on\ncommon variants and AbExp",
         y="Prediction based on\ncommon variants",
         title=paste0(phenotype_col, " level")
     )
@@ -318,7 +319,7 @@ plot_3 <- (
     )
     # + coord_fixed()
     + labs(
-        x="Prediction based on\ncommon variants and AbExp-DNA",
+        x="Prediction based on\ncommon variants and AbExp",
         y=paste0("Measurement"),
         title=paste0(phenotype_col, " level")
     )
@@ -526,7 +527,7 @@ lower_lhs = ggarrange(
         plot_4 
         + ggtitle(NULL)
         + xlab("")
-        + ylab("Relative increase in R² between\n AbExp-DNA and LOFTEE")
+        + ylab("Relative increase in R² between\n AbExp and LOFTEE")
         + theme(
             # axis.title.y = element_blank(),
             legend.position = "bottom"
@@ -736,9 +737,9 @@ display_png(file=paste0(path, ".png"))
 # %%
 rename_models = c(
     `LOFTEE_pLoF` = "LOFTEE",
-    `AbExp_all_tissues` = "AbExp-DNA all tissues",
-    `max_AbExp` = "Minimum AbExp-DNA",
-    `median_AbExp` = "Median AbExp-DNA"
+    `AbExp_all_tissues` = "AbExp all tissues",
+    `max_AbExp` = "Minimum AbExp",
+    `median_AbExp` = "Median AbExp"
 )
 
 # %%
@@ -885,5 +886,412 @@ ggsave(paste0(path, ".png"), qq_plot, width = w, height = h, dpi=600, type = "ca
 display_png(file=paste0(path, ".png"))
 ggsave(paste0(path, ".pdf"), qq_plot, width = w, height = h, dpi=600, device=cairo_pdf)
 ggsave(paste0(path, ".svg"), qq_plot, width = w, height = h, dpi=600, device=svg)
+
+# %% [markdown]
+# # Linear risk scores
+
+# %% [markdown]
+# ## r² bar plot proportional difference
+
+# %%
+linear_phenotype_label_order = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_linear_dir, "/r2_bar_plot_proportional_difference.LOFTEE_pLoF__vs__AbExp_all_tissues.parquet")))
+linear_phenotype_label_order = linear_phenotype_label_order[,.(`phenotype_label_order`=mean(`difference_to_LOFTEE_pLoF`)), by=`phenotype_col`]
+linear_phenotype_label_order = linear_phenotype_label_order[order(`phenotype_label_order`, decreasing = TRUE)]$phenotype_col
+linear_phenotype_label_order
+
+# %%
+linear_pheno_df = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_linear_dir, "/r2_bar_plot_proportional_difference.LOFTEE_pLoF__vs__AbExp_all_tissues.parquet")))
+linear_pheno_df
+
+# %%
+linear_plot_4 = (
+    ggplot(linear_pheno_df, aes(
+        x=reorder(`phenotype_col`, `proportional_difference_to_LOFTEE_pLoF`),
+        y=`proportional_difference_to_LOFTEE_pLoF`,
+        color=`significant`,
+    ))
+    # + geom_boxplot()
+    # + geom_bar(
+    #     stat=stat_summary(fun_y=np.mean),
+    # )
+    + scale_x_discrete(breaks=linear_phenotype_label_order)
+    + stat_summary(
+        fun.min=function(x){ mean(x) - sd(x) },
+        fun.max=function(x){ mean(x) + sd(x) },
+        geom = "errorbar",
+        color="black"
+    )
+    + stat_mean(
+        size=3,
+        geom = "point"
+    )
+    + scale_color_manual(
+        name="",
+        values=c(`TRUE`="red"),
+        labels=c(`TRUE`="significant"),
+        na.value = "black"
+    )
+    + scale_y_continuous(
+        labels=scales::percent
+    )
+    + labs(
+        x="phenotype",
+        y="relative difference in R² between 'AbExp' and 'LOFTEE pLoF'",
+        title="Comparison of phenotype prediction models using different feature sets",
+    )
+    + THEME
+    + theme(
+        # legend_text=element_text(linespacing=1.4),
+        # figure_size=(8, 12),
+        # axis_text_x=element_text(
+        # #     rotation=45,
+        # #     hjust=1
+        #     # vjust=10,
+        # ),
+        # strip_text_y=element_text(
+        #     rotation=0,
+        # ),
+        # title=element_text(linespacing=1.4, vjust=-10),
+        # axis_title_x=element_text(linespacing=1.4, vjust=-10),
+    )
+    # + coord_equal()
+    + coord_flip()
+)
+
+linear_plot_4
+
+# %%
+path = paste0(snakemake@params$output_basedir, "/r2_bar_plot_proportional_difference__linear")
+print(paste0("Saving to ", path, "..."))
+ggsave(paste0(path, ".png"), linear_plot_4, width = 8, height = 6, dpi=600, type = "cairo")
+ggsave(paste0(path, ".pdf"), linear_plot_4, width = 8, height = 6, dpi=600, device=cairo_pdf)
+
+# display_pdf(file=paste0(path, ".pdf"))
+display_png(file=paste0(path, ".png"))
+
+# %% [markdown]
+# ## number of individuals where the absolute error increased/decreased
+
+# %%
+snakemake@params$compare_risk_scores_dir
+
+# %%
+linear_pheno_indivs_df = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_linear_dir, "/num_individuals_with_changed_abserr.diverging_barplot.parquet")))
+linear_pheno_indivs_df = linear_pheno_indivs_df[`sd_cutoff_label` %in% c("0.5 SD", "0.75 SD", "1.0 SD")]
+linear_pheno_indivs_df
+
+# %%
+linear_pheno_indivs_df[,.(`error_increase` = sum(`increase`), `error_reduce` = sum(`reduce`)), by=c("feature_set", "sd_cutoff", "sd_cutoff_label")]
+
+# %%
+dodge_width=0.9
+linear_plot_5 = (
+    ggplot(subset(linear_pheno_indivs_df, sd_cutoff == '1'), aes(x=reorder(`phenotype_col`, `reduce`), fill = `feature_set`, width=.8))
+    + geom_col(aes(y=-`increase`), position=position_dodge(width=dodge_width, preserve='single'), alpha=1)
+    + geom_col(aes(y=`reduce`), position=position_dodge(width=dodge_width, preserve='single'))
+    # + geom_col(aes(y="-increase"), position=positions.position_dodge(preserve='single'), alpha=0.5)
+    # + geom_col(aes(y="reduce"), position=positions.position_dodge(preserve='single'))
+    + geom_hline(aes(yintercept = 0))
+    + scale_x_discrete(breaks=linear_phenotype_label_order)
+    + scale_fill_manual(
+        labels=c(
+            `AbExp_all_tissues` = "AbExp",
+            `LOFTEE_pLoF` = "LOFTEE"
+        ),
+        # values=c("orange", "#619CFF"),
+        values=c(
+            `AbExp_all_tissues` = "#48a462",
+            `LOFTEE_pLoF` = "#999999"
+            # `LOFTEE_pLoF` = "#619CFF"
+        ),
+    )
+    + theme(
+        # figure_size=(8, 8),
+    )
+    #+ facet_wrap("sd_cutoff_label", scales="free_x")
+    # + scale_x_discrete(limits=plot_df.query("feature_set=='AbExp_all_tissues' and sd_cutoff==1").sort_values("reduce")["phenotype_col"].to_list())
+    # + scale_fill_manual(["red", "blue"],breaks=reversed(["LOFTEE_pLoF", "AbExp_all_tissues"]))
+    + coord_flip()
+    + labs(
+        y='Nr. of individuals with:\n◀---- increased prediction error ---- ┃ ---- reduced prediction error ----▶',
+        x="phenotype",
+        title="Number of individuals where\nthe absolute error compared to the common-variant model\nchanges by more than 1.0 standard deviation"
+    )
+    + THEME
+    + theme(
+        plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(hjust=1, vjust=1, angle = 45)
+    )
+)
+
+linear_plot_5
+
+# %%
+path = paste0(snakemake@params$output_basedir, "/num_individuals_with_changed_abserr__linear")
+print(paste0("Saving to ", path, "..."))
+ggsave(paste0(path, ".png"), linear_plot_5, width = 8, height = 6, dpi=600, type = "cairo")
+ggsave(paste0(path, ".pdf"), linear_plot_5, width = 8, height = 6, dpi=600, device=cairo_pdf)
+
+# display_pdf(file=paste0(path, ".pdf"))
+display_png(file=paste0(path, ".png"))
+
+# %% [markdown]
+# ## rsquared
+
+# %%
+linear_rsquared_df = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_linear_dir, "/rsquared.parquet")))
+linear_rsquared_df = melt(linear_rsquared_df, id.vars=c("phenotype_col", "feature_set", "covariates"), variable="predictor_variables", value.name = "linear model R²")
+linear_rsquared_df[, `predictor_variables` := recode(as.factor(`predictor_variables`), !!!c(`full_model_r2`= "full", `restricted_model_r2` = "restricted"))]
+linear_rsquared_df = linear_rsquared_df[`predictor_variables` != "basic_model_r2"]
+linear_rsquared_df
+
+# %%
+nonlinear_rsquared_df = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_dir, "/rsquared.parquet")))
+nonlinear_rsquared_df = melt(nonlinear_rsquared_df, id.vars=c("phenotype_col", "feature_set", "covariates"), variable="predictor_variables", value.name = "gradient boosted trees model R²")
+nonlinear_rsquared_df[, `predictor_variables` := recode(as.factor(`predictor_variables`), !!!c(`full_model_r2`= "full", `restricted_model_r2` = "restricted"))]
+nonlinear_rsquared_df = nonlinear_rsquared_df[`predictor_variables` != "basic_model_r2"]
+nonlinear_rsquared_df
+
+# %%
+rsquared_df = merge(linear_rsquared_df, nonlinear_rsquared_df, by=c("phenotype_col", "feature_set", "covariates", "predictor_variables"), how="inner")
+rsquared_df[, `feature_set` := recode(`feature_set`, `AbExp_all_tissues` = "AbExp all tissues", `LOFTEE_pLoF` = "LOFTEE")]
+rsquared_df$phenotype_col = str_replace_all(rsquared_df$phenotype_col, "_", " ")
+rsquared_df
+
+# %%
+plot = (
+    ggplot(rsquared_df, aes(x=`linear model R²`, y=`gradient boosted trees model R²`, color=`phenotype_col`))
+    + geom_point(size=2)
+    + geom_abline(slope=1, color="black", linetype="dashed")
+    + labs(
+        # title="Number of significantly associating genes\n(p-values, alpha=0.05)",
+        # y="Genes discovered by AbExp aggregated across tissues",
+        # x="Genes discovered by AbExp using all tissues"
+    )
+    # + geom_text_repel(
+    #     # data = plot_df[(significant == TRUE)], 
+    #     data = plot_df[(`phenotype_col` %in% traits_to_show)],
+    #     min.segment.length = 0,
+    #     point.size = 5,
+    #     aes(label=`phenotype_col`)
+    # )
+    + facet_grid("feature_set ~ predictor_variables")
+    # + coord_equal()
+    # + coord_flip()
+    # + facet_wrap("variable", nrow=1)
+    + THEME
+    + theme(
+        legend.position="bottom",
+        legend.title = element_blank()
+    )
+    # + labs(tag="a")
+)
+
+plot
+
+# %%
+plot_df = subset(rsquared_df, (`predictor_variables` == 'full') & (`feature_set` %in% c("AbExp all tissues", "LOFTEE")))
+
+# %%
+plot_df$phenotype_col
+
+# %%
+traits_to_show = c(
+    # "LDL direct",
+    #"Albumin",
+    "Apolipoprotein B",
+    "Lipoprotein A",
+    # "Alkaline phosphatase",
+    # "Aspartate\naminotransferase",
+    # "Basophill\ncount",
+    # "Phosphate",
+    # "IGF1",
+    # "Testosterone",
+    # "Aspartate\naminotransferase",
+    # "Direct\nbilirubin",
+    # "SHBG",
+    # "Urate",
+    "HDL cholesterol",
+    # 'Mean sphered cell volume',
+    "Triglycerides",
+    #"Alanine\naminotransferase",
+    #"Apolipoprotein\nA",
+    # "c reactive\nprotein"
+    ""
+)
+print(traits_to_show)
+
+# %%
+rsquared_plot = (
+    ggplot(
+        plot_df,
+        aes(
+            x=`linear model R²`,
+            y=`gradient boosted trees model R²`
+            # color=`phenotype_col`
+        )
+    )
+    + geom_point(size=2)
+    + geom_abline(slope=1, color="black", linetype="dashed")
+    + geom_text_repel(
+        # data = plot_df[(significant == TRUE)], 
+        data = plot_df[(`phenotype_col` %in% traits_to_show)],
+        min.segment.length = 0,
+        point.size = 5,
+        nudge_x = -0.02,
+        nudge_y = 0.1,
+        aes(label=`phenotype_col`)
+    )
+    + xlim(0, 0.7)
+    + ylim(0, 0.7)
+    + labs(
+        x="Elastic net model R²",
+        y="Gradient boosted trees model R²"
+        # title="Number of significantly associating genes\n(p-values, alpha=0.05)",
+        # y="Genes discovered by AbExp aggregated across tissues",
+        # x="Genes discovered by AbExp using all tissues"
+    )
+    # + geom_text_repel(
+    #     # data = plot_df[(significant == TRUE)], 
+    #     data = plot_df[(`phenotype_col` %in% traits_to_show)],
+    #     min.segment.length = 0,
+    #     point.size = 5,
+    #     aes(label=`phenotype_col`)
+    # )
+    + facet_wrap("feature_set")
+    # + coord_equal()
+    # + coord_flip()
+    # + facet_wrap("variable", nrow=1)
+    + THEME
+    + theme(
+        legend.position="bottom",
+        legend.title = element_blank()
+    )
+    # + labs(tag="a")
+)
+
+rsquared_plot
+
+# %% [markdown]
+# ## common plot
+
+# %%
+supplementary_s4_plot = ggarrange(
+    ggarrange(
+        (
+            linear_plot_4 
+            + ggtitle(NULL)
+            + xlab("")
+            + ylab("Relative increase in R² between\n AbExp and LOFTEE")
+            + theme(
+                # axis.title.y = element_blank(),
+                legend.position = "bottom"
+                # legend.title = element_text("Nr. of individuals")
+                # legend.title = element_blank(),
+            )
+            + labs(tag = "a")
+        ), (
+            linear_plot_5
+            # + facet_wrap("sd_cutoff_label")
+            # + scale_fill_discrete(
+            #     name="",
+            #     labels=c(
+            #         `AbExp_all_tissues` = "AbExp-DNA",
+            #         `LOFTEE_pLoF` = "LOFTEE pLoF"
+            #     )
+            # )
+            + ggtitle(NULL)
+            + ylab("Individuals with changed error:\n◀ increased ┃ reduced ▶")
+            # + ylab("Individuals with:\n◀-- increased error -- ┃ -- reduced error --▶")
+            + theme(
+                axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                # legend.title = element_text("Nr. of individuals")
+                legend.title = element_blank(),
+                legend.position = "bottom"
+            )
+            # + scale_fill_manual(values=c("orange", "#619CFF"),labels=c(
+            #         `AbExp_all_tissues` = "AbExp",
+            #         `LOFTEE_pLoF` = "LOFTEE pLoF"
+            # ))
+            + labs(tag = "b")
+        ),
+        align="h",
+        # labels=c("c", "d"),
+        widths=c(1.7, 1)
+        # #+ ylab("proportional difference in r² between\n AbExp-DNA and LOFTEE pLoF")
+        # + plot_layout(widths = c(1, 1))
+        # & theme(plot.margin = margin(0,0,0,0))
+    ),
+    (
+        rsquared_plot
+        + labs(tag = "c")
+    ),
+    nrow=2,
+    heights=c(2, 1)
+)
+supplementary_s4_plot
+
+# %%
+supplementary_s4_plot = ggarrange(
+    (
+        (
+            linear_plot_4 
+            + ggtitle(NULL)
+            + xlab("")
+            + ylab("Relative increase in R² between\n AbExp and LOFTEE")
+            + theme(
+                # axis.title.y = element_blank(),
+                legend.position = "bottom"
+                # legend.title = element_text("Nr. of individuals")
+                # legend.title = element_blank(),
+            )
+            + labs(tag = "a")
+        ) + (
+            linear_plot_5
+            # + facet_wrap("sd_cutoff_label")
+            # + scale_fill_discrete(
+            #     name="",
+            #     labels=c(
+            #         `AbExp_all_tissues` = "AbExp-DNA",
+            #         `LOFTEE_pLoF` = "LOFTEE pLoF"
+            #     )
+            # )
+            + ggtitle(NULL)
+            + ylab("Individuals with changed error:\n◀ increased ┃ reduced ▶")
+            # + ylab("Individuals with:\n◀-- increased error -- ┃ -- reduced error --▶")
+            + theme(
+                axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                # legend.title = element_text("Nr. of individuals")
+                legend.title = element_blank(),
+                legend.position = "bottom"
+            )
+            # + scale_fill_manual(values=c("orange", "#619CFF"),labels=c(
+            #         `AbExp_all_tissues` = "AbExp",
+            #         `LOFTEE_pLoF` = "LOFTEE pLoF"
+            # ))
+            + labs(tag = "b")
+        )
+    ) /
+    (
+        rsquared_plot
+        + labs(tag = "c")
+    )
+    + plot_layout(heights=c(2, 1))
+)
+supplementary_s4_plot
+
+# %%
+path = paste0(snakemake@params$output_basedir, "/supplementary_s4")
+print(paste0("Saving to ", path, "..."))
+ggsave(paste0(path, ".png"), supplementary_s4_plot, width = 10, height = 12, dpi=600, type = "cairo")
+display_png(file=paste0(path, ".png"))
+ggsave(paste0(path, ".svg"), supplementary_s4_plot, width = 10, height = 12, dpi=600, device=svg)
+ggsave(paste0(path, ".pdf"), supplementary_s4_plot, width = 10, height = 12, dpi=600, device=cairo_pdf)
+
+# display_pdf(file=paste0(path, ".pdf"))
 
 # %%

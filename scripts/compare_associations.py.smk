@@ -14,31 +14,32 @@ def _compare_associations_input_fn(wildcards, yaml_path=YAML_PATH):
     yaml_path = yaml_path.format(comparison=wildcards.comparison)
     
     with open(yaml_path, "r") as fd:
-        config=yaml.safe_load(fd)
+        comp_config=yaml.safe_load(fd)
     
     input_files={
         **{
             k: expand(
                 v,
                 # feature_set_basepath + '/config.yaml',
-                phenotype_col=config["phenotypes"], 
-                feature_set=config["features_sets"],
-                covariates=config["covariates"],
+                phenotype_col=comp_config["phenotypes"], 
+                feature_set=comp_config["features_sets"],
+                covariates=comp_config["covariates"],
             )
             for k, v in rules.associate__regression.output.items()
         },
         "compare_monti_pq": expand(
             rules.associate__compare_monti.output["compare_monti_pq"],
-            phenotype_col=config["phenotypes"], 
-            feature_set=config["features_sets"],
-            covariates=config["covariates"],
+            phenotype_col=comp_config["phenotypes"], 
+            feature_set=comp_config["features_sets"],
+            covariates=comp_config["covariates"],
         ),
         "most_associating_terms_pq": expand(
             rules.associate__compare_genebass.output["most_associating_terms_pq"],
-            phenotype_col=config["phenotypes"], 
-            feature_set=config["features_sets"],
-            covariates=config["covariates"],
-        )
+            phenotype_col=comp_config["phenotypes"], 
+            feature_set=comp_config["features_sets"],
+            covariates=comp_config["covariates"],
+        ),
+        "protein_coding_genes_pq": config["protein_coding_genes_pq"],
     }
     
     return input_files
@@ -52,6 +53,7 @@ rule compare_associations:
         mem_mb=lambda wildcards, attempt, threads: (4000 * threads) * attempt
     output:
         significant_genes_pq=directory(f"{OUTPUT_BASEPATH}/significant_genes.parquet"),
+        significant_genes_csv=f"{OUTPUT_BASEPATH}/significant_genes.csv",
         qq_plot_pq=f"{OUTPUT_BASEPATH}/qq_plot.parquet",
         qq_plot_png=f"{OUTPUT_BASEPATH}/qq_plot.png",
         qq_plot_pdf=f"{OUTPUT_BASEPATH}/qq_plot.pdf",

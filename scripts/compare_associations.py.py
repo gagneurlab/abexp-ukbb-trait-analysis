@@ -77,7 +77,7 @@ except NameError:
         rule_name = 'compare_associations',
         default_wildcards={
             # "comparison": "all",
-            "comparison": "paper_figure_randomized",
+            "comparison": "paper_figure",
         }
     )
 
@@ -116,23 +116,20 @@ pval_cutoff
 # ## read association results
 
 # %%
+genes_df = spark.read.parquet(snakemake.input["protein_coding_genes_pq"])
+genes_df.printSchema()
+
+# %%
 snakemake.input["associations_pq"]
 
 # %%
 regression_results_df = (
     spark.read.parquet(*snakemake.input["associations_pq"])
-    # .sort("rsquared", descending=True)
-    # .drop([
-    #     "term_pvals",
-    #     "params",
-    # ])
-    # .with_column(pl.min([
-    #     pl.col("lr_pval") * pl.count(),
-    #     1.0,
-    # ]).alias("padj"))
-    # .with_column((pl.col("rsquared") - pl.col("rsquared_restricted")).alias("rsquared_diff"))
-    # .collect()
-    # # .to_pandas()
+    .join(
+        genes_df.withColumnRenamed("gene_id", "gene"),
+        on="gene",
+        how="left"
+    )
 )
 
 # print(f"Corrected for {regression_results_df.shape[0]} association tests...")
@@ -266,12 +263,30 @@ adj_regression_results_pd_df = (
 adj_regression_results_pd_df
 
 # %%
+import urllib
+
+# %%
 significant_associations_pd_df = (
     significant_associations
     .drop("term_pvals", "params")
     .toPandas()
+    .sort_values([
+        "feature_set",
+        "covariates",
+        "phenotype_col",
+        "lr_pval",
+    ])
+)
+significant_associations_pd_df["most_associating_term"] = (
+    significant_associations_pd_df["most_associating_term"]
+    .str.replace(r"Q\('(.*)@(AbExp_)?(.*)'\)", r"\3", regex=True)
+    .apply(lambda s: urllib.parse.unquote(s))
+    .str.replace("_", " ")
 )
 significant_associations_pd_df
+
+# %%
+significant_associations_pd_df.to_csv(snakemake.output["significant_genes_csv"], index=False)
 
 # %%
 with pd.option_context('display.max_rows', 500, 'display.max_columns', 20):

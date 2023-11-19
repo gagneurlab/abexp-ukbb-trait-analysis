@@ -82,6 +82,8 @@ except NameError:
         default_wildcards={
             # "comparison": "all", 
             "comparison": "paper_figure",
+            # "model_type": "lightgbm",
+            "model_type": "linear",
         }
     )
 
@@ -367,6 +369,86 @@ def ttest(score_diff, cutoff=0.05):
     return float(t_stat), float(pvalue), float(pvalue) < cutoff
 
 
+# %% [raw]
+# subset_plot_df = unstacked_plot_full_df.reset_index()
+# assert np.all(unstacked_plot_restricted_df[feature_x].values == unstacked_plot_restricted_df[feature_y].values)
+# subset_plot_df = subset_plot_df.assign(**{
+#     f"difference_to_{feature_x}": subset_plot_df[feature_y] - subset_plot_df[feature_x],
+#     f"proportional_difference_to_{feature_x}": (subset_plot_df[feature_y] - subset_plot_df[feature_x]) / subset_plot_df[feature_x],
+#     "phenotype_col": subset_plot_df["phenotype_col"].str.replace("_", " "),
+#     "baseline": unstacked_plot_restricted_df[feature_x].values,
+#     # f"difference_to_baseline": subset_plot_df[feature_y] - unstacked_plot_restricted_df[feature_x].values,
+# })
+# subset_plot_df = (
+#     subset_plot_df
+#     .groupby(["phenotype_col", "covariates"]).apply(lambda df:
+#         # NormalDist(mu=df[f"difference_to_{feature_x}"].mean(), sigma=df[f"difference_to_{feature_x}"].std()).overlap(NormalDist(mu=0, sigma=df[f"difference_to_{feature_x}"].std()))
+#         # 1 if np.all(df[feature_x] == df[feature_y]) else scipy.stats.wilcoxon(df[feature_x], df[feature_y], alternative="two-sided").pvalue
+#         1 if np.all(df[feature_x] == df[feature_y]) else ttest(df[feature_x] - df[feature_y])[1]
+#     )
+#     .to_frame(name="pval")
+#     .merge(subset_plot_df, on=["phenotype_col", "covariates"], how="right")
+# )
+# subset_plot_df = subset_plot_df.assign(significant=subset_plot_df["pval"] < 0.1) # two-sided
+#
+# plot = (
+#     pn.ggplot(subset_plot_df.reset_index(), pn.aes(
+#         x=f"reorder(phenotype_col, difference_to_{feature_x})",
+#         y=f"difference_to_{feature_x}",
+#         fill="significant",
+#     ))
+#     # + pn.geom_boxplot()
+#     # + pn.geom_bar(
+#     #     stat=pn.stat_summary(fun_y=np.mean),
+#     # )
+#     + pn.geom_errorbar(
+#         stat=pn.stat_summary(
+#             fun_ymin=lambda x: np.mean(x) - np.std(x),
+#             fun_ymax=lambda x: np.mean(x) + np.std(x),
+#         ),
+#     )
+#     + pn.geom_point(
+#         stat=pn.stat_summary(fun_y=np.mean),
+#         size=3,
+#     )
+#     + pn.scale_fill_manual({
+#         False: "black",
+#         True: "red",
+#     })
+#     + pn.labs(
+#         x=f"""phenotype""",
+#         y=f"""difference in r² between '{feature_y.replace("_", " ")}' and '{feature_x.replace("_", " ")}'""",
+#         title=f"Comparison of phenotype prediction models using different feature sets",
+#     )
+#     + pn.theme(
+#         # legend_text=pn.element_text(linespacing=1.4),
+#         figure_size=(8, 12),
+#         axis_text_x=pn.element_text(
+#         #     rotation=45,
+#         #     hjust=1
+#             # vjust=10,
+#         ),
+#         # strip_text_y=pn.element_text(
+#         #     rotation=0,
+#         # ),
+#         title=pn.element_text(linespacing=1.4, vjust=-10),
+#         axis_title_x=pn.element_text(linespacing=1.4, vjust=-10),
+#     )
+#     # + pn.coord_equal()
+#     + pn.coord_flip()
+# )
+# display(plot)
+#
+# path = snakemake.params["output_basedir"] + f"/r2_bar_plot_difference.{feature_x}__vs__{feature_y}"
+# pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
+# pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+# del plot
+# subset_plot_df.to_parquet(path + ".parquet", index=False)
+# subset_plot_df.to_csv(path + ".csv", index=False)
+
+# %% [raw]
+# subset_plot_df.query("phenotype_col == 'Mean sphered cell volume'")
+
 # %%
 import itertools
 
@@ -447,6 +529,7 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
     path = snakemake.params["output_basedir"] + f"/r2_bar_plot_difference.{feature_x}__vs__{feature_y}"
     pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
     pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+    del plot
     subset_plot_df.to_parquet(path + ".parquet", index=False)
     subset_plot_df.to_csv(path + ".csv", index=False)
 
@@ -539,6 +622,7 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
     path = snakemake.params["output_basedir"] + f"/r2_bar_plot_proportional_difference.{feature_x}__vs__{feature_y}"
     pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
     pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+    del plot
     subset_plot_df.to_parquet(path + ".parquet", index=False)
     subset_plot_df.to_csv(path + ".csv", index=False)
 
@@ -799,6 +883,7 @@ for feature_x, feature_y in list(itertools.product(keys, keys)):
     path = snakemake.params["output_basedir"] + f"/diff_individuals_at_risk.heatmap.{feature_x}__vs__{feature_y}"
     pn.ggsave(plot, path + ".png", dpi=DPI, limitsize=False)
     pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
+    del plot
 
 
 # %%

@@ -99,7 +99,7 @@ aggregated_df = (
     .groupby("gene", "individual")
     .pivot("subtissue", values=subtissues.to_list())
     .agg(
-        f.first(f.col("y_pred_proba")).alias("AbExp")
+        f.first(f.col("y_pred")).alias("AbExp")
         # f.struct(
         #     *[
         #         f.coalesce(

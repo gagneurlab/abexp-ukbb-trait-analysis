@@ -41,6 +41,13 @@ import matplotlib.pyplot as plt
 import lightgbm as lgb
 
 # %%
+import sklearn
+import sklearn.pipeline
+import sklearn.linear_model
+import sklearn.preprocessing
+import sklearn.metrics
+
+# %%
 # %matplotlib inline
 # %config InlineBackend.figure_format='retina'
 
@@ -99,22 +106,23 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'associate__polygenic_risk_score',
         default_wildcards={
-            "phenotype_col": "HDL_cholesterol",
+            # "phenotype_col": "HDL_cholesterol",
             # "phenotype_col": "standing_height",
             # "phenotype_col": "glycated_haemoglobin_hba1c",
-            # "phenotype_col": "Lipoprotein_A",
+            "phenotype_col": "Lipoprotein_A",
             # "phenotype_col": "BodyMassIndex",
             # "phenotype_col": "Triglycerides",
             # "phenotype_col": "LDL_direct",
             # "phenotype_col": "systolic_blood_pressure",
             # "phenotype_col": "HDL_cholesterol",
             # "feature_set": "LOFTEE_pLoF",
-            # "feature_set": "AbExp_all_tissues",
-            "feature_set": "LOFTEE_pLoF",
+            "feature_set": "AbExp_all_tissues",
+            # "feature_set": "LOFTEE_pLoF",
             "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex_age_genPC_CLMP",
             # "covariates": "sex_age_genPC",
-            "model_type": "lightgbm" #\in ['lightgbm', 'linear']. Defaults to lightgbm for any other value
+            # "model_type": "lightgbm" #\in ['lightgbm', 'linear']. Defaults to lightgbm for any other value
+            "model_type": "normalized_linear" #\in ['lightgbm', 'linear']. Defaults to lightgbm for any other value
         }
     )
 
@@ -435,6 +443,17 @@ prs_features_pd_df = (
 prs_features_pd_df
 
 # %%
+normalize_features = snakemake.wildcards["model_type"].startswith("normalized_")
+normalize_features
+
+# %%
+if normalize_features:
+    prs_features_pd_df = prs_features_pd_df.assign(**{
+        col: sklearn.preprocessing.StandardScaler().fit_transform(prs_features_pd_df[[col]])[:, 0] for col in restricted_variables if col in prs_features_pd_df.columns and np.any(~ np.isin(prs_features_pd_df[col], [0, 1]))
+    })
+    display(prs_features_pd_df)
+
+# %%
 spark.sparkContext._jvm.System.gc()
 
 # %% [markdown]
@@ -459,15 +478,10 @@ prs_features_pd_df
 prs_features_pd_df = prs_features_pd_df.dropna()
 prs_features_pd_df
 
+# %%
+
 # %% [markdown]
 # # perform regression
-
-# %%
-import sklearn
-import sklearn.pipeline
-import sklearn.linear_model
-import sklearn.preprocessing
-import sklearn.metrics
 
 # %% [markdown]
 # ## prepare training data
@@ -498,6 +512,14 @@ full_variables
 snakemake.wildcards["model_type"]
 
 # %%
+if snakemake.wildcards["model_type"] == "lightgbm":
+    model_type = lgb.LGBMRegressor
+elif snakemake.wildcards["model_type"] in {"linear", "normalized_linear"}:
+    model_type = sklearn.linear_model.ElasticNetCV
+else:
+    raise ValueError(f"""Unknown model type: '{snakemake.wildcards["model_type"]}'""")
+print(f"Using {model_type}...")
+
 cv_pred_dfs = []
 for fold, (train_fold_index, test_fold_index) in enumerate(cv_split.split()):
     print(f"training fold {fold}...")
@@ -506,15 +528,15 @@ for fold, (train_fold_index, test_fold_index) in enumerate(cv_split.split()):
     X_fold_test = train_df.iloc[test_fold_index][full_variables]
     # y_fold_test = train_df.iloc[test_fold_index][phenotype_col]
     
-    model_full = sklearn.linear_model.LinearRegression() if snakemake.wildcards["model_type"]=="linear" else lgb.LGBMRegressor()
+    model_full = model_type()
     model_full.fit(X_fold_train[full_variables], y_fold_train)
     full_pred_test = model_full.predict(X_fold_test)
     
-    model_restricted = sklearn.linear_model.LinearRegression() if snakemake.wildcards["model_type"]=="linear" else lgb.LGBMRegressor()
+    model_restricted = model_type()
     model_restricted.fit(X_fold_train[restricted_variables], y_fold_train)
     restricted_pred_test = model_restricted.predict(X_fold_test[restricted_variables])
     
-    model_basic = sklearn.linear_model.LinearRegression() if snakemake.wildcards["model_type"]=="linear" else lgb.LGBMRegressor()
+    model_basic = model_type()
     model_basic.fit(X_fold_train[basic_variables], y_fold_train)
     basic_pred_test = model_basic.predict(X_fold_test[basic_variables])
     

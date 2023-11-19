@@ -126,8 +126,14 @@ mapped_string_ids = significant_genes.join(mapped_string_ids, on="gene", how="in
 mapped_string_ids
 
 # %%
+mapped_string_ids.write_parquet(snakemake.output["stringdb_ids_pq"])
+
+# %%
 network = stringdb.get_network(mapped_string_ids["stringId"].unique())
 network
+
+# %%
+network.to_parquet(snakemake.output["stringdb_network_pq"], index=False)
 
 
 # %% [raw]

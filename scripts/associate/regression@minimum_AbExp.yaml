@@ -5,14 +5,14 @@ index_columns:
 
 
 feature_sets:
-  AbExp: "{config.feature_sets_dir}/abexp.py@agg=max"
+  AbExp: "{config.feature_sets_dir}/abexp.py@agg=minimum"
 
 variables:
   "AbExp":
-    - "max_AbExp"
+    - "minimum_AbExp"
 
 fill_values:
-  "feature.AbExp@max_AbExp": 0.0
+  "feature.AbExp@minimum_AbExp": 0.0
 
 
 groupby_columns:

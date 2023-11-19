@@ -5,10 +5,11 @@ SCRIPT=os.path.basename(SNAKEFILE)[:-4]
 
 
 # OUTPUT_BASEPATH=f'''{config["trait_association_comparison"]}/cov={{covariates}}/fset={{feature_set}}'''
-OUTPUT_BASEPATH=f'''{config["risk_score_comparison"]}/comp={{comparison}}'''
+OUTPUT_BASEPATH=f'''{config["risk_score_comparison"]}/comp={{comparison}}/type={{model_type}}'''
 YAML_PATH=f"""{SNAKEFILE_DIR}/compare_risk_scores@{{comparison}}.yaml"""
 COVARIATES_BASEPATH=f'''{config["trait_associations"]}/cov={{covariates}}'''
-FEATURE_SET_BASEPATH=f'''{COVARIATES_BASEPATH}/fset={{feature_set}}'''
+FEATURE_SET_BASEPATH=f'''{COVARIATES_BASEPATH}/fset={{feature_set}}/type={{model_type}}'''
+
 
 def _compare_risk_scores_input_fn(wildcards, yaml_path=YAML_PATH, feature_set_basepath=FEATURE_SET_BASEPATH):
     import yaml
@@ -26,6 +27,7 @@ def _compare_risk_scores_input_fn(wildcards, yaml_path=YAML_PATH, feature_set_ba
                 phenotype_col=config["phenotypes"], 
                 feature_set=config["features_sets"],
                 covariates=config["covariates"],
+                model_type=wildcards.model_type,
             )
             for k, v in rules.associate__polygenic_risk_score.output.items()
         },
@@ -34,6 +36,7 @@ def _compare_risk_scores_input_fn(wildcards, yaml_path=YAML_PATH, feature_set_ba
             phenotype_col=config["phenotypes"], 
             feature_set=config["features_sets"],
             covariates=config["covariates"],
+            model_type=wildcards.model_type,
         )
     }
     

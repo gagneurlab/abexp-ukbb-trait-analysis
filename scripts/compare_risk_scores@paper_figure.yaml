@@ -76,9 +76,9 @@ covariates:
 # - "randomized_sex_age_genPC_CLMP_PRS"
 
 features_sets:
-- "LOFTEE_pLoF"
+- "LOFTEE"
 - "AbExp_all_tissues"
-- "max_AbExp"
+- "minimum_AbExp"
 - "median_AbExp"
 
 pval_cutoff: 0.05

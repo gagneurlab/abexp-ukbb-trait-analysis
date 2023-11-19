@@ -53,7 +53,7 @@ except NameError:
         snakefile = snakefile_path,
         rule_name = 'feature_sets__abexp',
         default_wildcards={
-            'agg': "max",
+            'agg': "minimum",
             # 'agg': "mean",
             # 'agg': "median",
         }
@@ -100,17 +100,25 @@ agg_df = (
     .groupby("gene", "individual")
 )
 
-if agg == "max":
+if agg == "minimum":
     agg_df = agg_df.agg(
-        f.max(f.col("y_pred_proba")).alias("max_AbExp")
+        f.min(f.col("y_pred")).alias("minimum_AbExp")
+    )
+elif agg == "maximum":
+    agg_df = agg_df.agg(
+        f.max(f.col("y_pred")).alias("maximum_AbExp")
+    )
+elif agg == "abs_max":
+    agg_df = agg_df.agg(
+        f.max(f.abs(f.col("y_pred"))).alias("abs_max_AbExp")
     )
 elif agg == "mean":
     agg_df = agg_df.agg(
-        f.mean(f.col("y_pred_proba")).alias("mean_AbExp")
+        f.mean(f.col("y_pred")).alias("mean_AbExp")
     )
 elif agg == "median":
     agg_df = agg_df.agg(
-        f.expr('percentile(y_pred_proba, array(0.5))')[0].alias("median_AbExp")
+        f.expr('percentile(y_pred, array(0.5))')[0].alias("median_AbExp")
         # f.median(f.col("y_pred_proba")).alias("median_AbExp")
     )
 else:

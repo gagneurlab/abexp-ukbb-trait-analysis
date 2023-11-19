@@ -63,8 +63,8 @@ covariates:
 - "sex_age_genPC_CLMP_PRS"
 
 features_sets:
-- "LOFTEE_pLoF"
-- "max_AbExp"
+- "LOFTEE"
+- "minimum_AbExp"
 - "median_AbExp"
 - "AbExp_all_tissues"
 

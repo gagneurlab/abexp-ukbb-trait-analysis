@@ -1,6 +1,1 @@
 aggregation: "median"
-
-exclude:
-  subtissue:
-    # remove testis bc of strange expression patterns
-    - "Testis"

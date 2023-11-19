@@ -37,6 +37,7 @@ import polars as pl
 # %%
 import re
 import patsy
+import sklearn
 
 # %%
 import plotnine as pn
@@ -124,11 +125,12 @@ except NameError:
             "phenotype_col": "HDL_cholesterol",
             # "feature_set": "LOFTEE_pLoF",
             # "feature_set": "max_AbExp",
-            # "feature_set": "AbExp_all_tissues",
-            "feature_set": "AbExp_best_tissue",
+            "feature_set": "AbExp_all_tissues",
+            # "feature_set": "AbExp_best_tissue",
             # "feature_set": "LOFTEE_pLoF",
             # "covariates": "randomized_sex_age_genPC_CLMP_PRS",
-            "covariates": "sex_age_genPC_BMI_smoking_CLMP_PRS",
+            "covariates": "sex_age_genPC_CLMP_PRS",
+            # "covariates": "sex_age_genPC_CLMP_PRS_notnormalized",
             # "covariates": "sex_age_genPC_CLMP_PRS",
             # "covariates": "sex_age_genPC_CLMP",
             # "covariates": "sex_age_genPC",
@@ -165,6 +167,12 @@ print(restricted_formula)
 # Should we only keep the most associating variable?
 aggregate_variables = config.get("aggregate_variables", False)
 aggregate_variables
+
+# %%
+normalize_covariates = config["covariates"].get("normalize_covariates", True)
+print(f"normalize_covariates: {normalize_covariates}")
+normalize_predictor_variables = config.get("normalize_predictor_variables", False)
+print(f"normalize_predictor_variables: {normalize_predictor_variables}")
 
 # %% [markdown]
 # # Broadcast/deref function definitions
@@ -293,17 +301,19 @@ covariates_df_columns = covariates_df.columns
 # )
 
 # %%
-import sklearn
-
 # perform data normalization
 normalized_covariates_df = covariates_df.collect().to_pandas()
-cols_to_normalize = list(set(covariates_df.columns).difference(phenotype_col))
-# cols_to_normalize = ["age_when_attended_assessment_centre_f21003_0_0"]
-cols_to_normalize = [col for col, dtype in normalized_covariates_df.dtypes[cols_to_normalize].to_dict().items() if (
-    pd.api.types.is_float_dtype(dtype)
-    or (pd.api.types.is_integer_dtype(dtype) and (np.abs(np.max(normalized_covariates_df[col])) > 2))
-)]
-display(cols_to_normalize)
+
+if normalize_covariates:
+    cols_to_normalize = list(set(covariates_df.columns).difference(phenotype_col))
+    # cols_to_normalize = ["age_when_attended_assessment_centre_f21003_0_0"]
+    cols_to_normalize = [col for col, dtype in normalized_covariates_df.dtypes[cols_to_normalize].to_dict().items() if (
+        pd.api.types.is_float_dtype(dtype)
+        or (pd.api.types.is_integer_dtype(dtype) and (np.abs(np.max(normalized_covariates_df[col])) > 2))
+    )]
+else:
+    cols_to_normalize = []
+print(f"Columns to normalize: {json.dumps(cols_to_normalize, indent=2, default=str)}")
 
 normalized_covariates_df = normalized_covariates_df.assign(**{
     col: sklearn.preprocessing.StandardScaler().fit_transform(normalized_covariates_df[[col]])[:, 0] for col in cols_to_normalize
@@ -1427,7 +1437,7 @@ def test_association(
     clumping_variants_df: pd.DataFrame = None,
     add_clumping: bool = config["covariates"]["add_clumping"],
     boolean_regression: bool = is_boolean_dtype,
-    normalize_features=True,
+    normalize_features=normalize_predictor_variables,
     aggregate_variables=aggregate_variables,
     return_models=False
 ):

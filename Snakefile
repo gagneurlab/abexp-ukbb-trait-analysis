@@ -10,7 +10,7 @@ import pathlib
 include: 'snakefile_utils.smk'
 
 workdir: "./"
-configfile: "config_v8.yaml"
+configfile: "config_v9.yaml"
 
 # sync config directory
 eprint("Syncing config directory...")
@@ -101,9 +101,16 @@ rule all:
             "paper_figure",
             "paper_figure_randomized",
         ]),
-        expand(rules.compare_risk_scores.output, comparison=[
-            "paper_figure",
-        ]),
+        expand(
+            rules.compare_risk_scores.output, 
+            comparison=[
+                "paper_figure",
+            ],
+            model_type=[
+                "lightgbm",
+                "linear",
+            ]
+        ),
         expand(
             rules.associate__qq_plot.output,
             phenotype_col=all_traits,
