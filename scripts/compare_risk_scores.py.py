@@ -83,7 +83,7 @@ except NameError:
             # "comparison": "all", 
             "comparison": "paper_figure",
             # "model_type": "lightgbm",
-            "model_type": "linear",
+            "model_type": "normalized_linear",
         }
     )
 
@@ -344,7 +344,7 @@ unstacked_plot_restricted_df
 # ### bar plot difference
 
 # %%
-# feature_x = "LOFTEE_pLoF"
+# feature_x = "LOFTEE"
 # feature_y = "AbExp_all_tissues"
 
 # %%
@@ -1013,7 +1013,7 @@ updates_df = pandas_df.query("updated").groupby(["phenotype_col", "feature_set",
 improvements_df = pandas_df.groupby(["phenotype_col", "feature_set", "full_model_improvement"]).size().unstack(fill_value=0).stack().reset_index().rename(columns={0 : "individuals"})
 
 # %% [raw]
-# plot_df = improvements_df.query("full_model_improvement!='none' and phenotype_col != 'Basophill_count' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").pivot(index=["phenotype_col", "feature_set"], columns="full_model_improvement", values='individuals').reset_index().fillna(0)
+# plot_df = improvements_df.query("full_model_improvement!='none' and phenotype_col != 'Basophill_count' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE'])").pivot(index=["phenotype_col", "feature_set"], columns="full_model_improvement", values='individuals').reset_index().fillna(0)
 # plot = (
 #         pn.ggplot(plot_df, pn.aes(x="phenotype_col", fill = "feature_set"))
 #         + pn.geom_col(pn.aes(y="-increase"),position = 'dodge')
@@ -1034,7 +1034,7 @@ improvements_df = pandas_df.groupby(["phenotype_col", "feature_set", "full_model
 
 # %%
 plot = (
-    pn.ggplot(improvements_df.query("full_model_improvement!='none' and phenotype_col != 'Basophill_count' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").pivot(index=["phenotype_col", "full_model_improvement"], columns="feature_set", values='individuals').reset_index().fillna(0), pn.aes(x="LOFTEE_pLoF", y="AbExp_all_tissues", fill="phenotype_col"))
+    pn.ggplot(improvements_df.query("full_model_improvement!='none' and phenotype_col != 'Basophill_count' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE'])").pivot(index=["phenotype_col", "full_model_improvement"], columns="feature_set", values='individuals').reset_index().fillna(0), pn.aes(x="LOFTEE", y="AbExp_all_tissues", fill="phenotype_col"))
     + pn.geom_point(size=3)
     + pn.facet_wrap("full_model_improvement")
     + pn.geom_abline(slope=1, color="black", linetype="dashed")
@@ -1075,10 +1075,10 @@ pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 updates_df.to_parquet(path + ".parquet", index=False)
 
 # %%
-plot_df = updates_df.query("phenotype_col != 'Basophill_count' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").pivot(index=["phenotype_col", "full_model_improvement"], columns="feature_set", values='individuals').reset_index().fillna(0)
-plot_df = plot_df.groupby("phenotype_col")[["AbExp_all_tissues","LOFTEE_pLoF"]].sum().reset_index()
+plot_df = updates_df.query("phenotype_col != 'Basophill_count' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE'])").pivot(index=["phenotype_col", "full_model_improvement"], columns="feature_set", values='individuals').reset_index().fillna(0)
+plot_df = plot_df.groupby("phenotype_col")[["AbExp_all_tissues","LOFTEE"]].sum().reset_index()
 plot = (
-    pn.ggplot(plot_df, pn.aes(x="LOFTEE_pLoF", y="AbExp_all_tissues", fill="phenotype_col"))
+    pn.ggplot(plot_df, pn.aes(x="LOFTEE", y="AbExp_all_tissues", fill="phenotype_col"))
     + pn.geom_point(size=3)
     #+ pn.facet_wrap("full_model_improvement")
     + pn.geom_abline(slope=1, color="black", linetype="dashed")
@@ -1096,10 +1096,10 @@ pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 plot_df.to_parquet(path + ".parquet", index=False)
 
 # %%
-errors_df = pandas_df.query("updated == True and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])").groupby(["phenotype_col" ,"feature_set"])["delta_abs_err"].median().reset_index().pivot(index="phenotype_col", columns="feature_set", values='delta_abs_err').reset_index()
+errors_df = pandas_df.query("updated == True and feature_set.isin(['AbExp_all_tissues', 'LOFTEE'])").groupby(["phenotype_col" ,"feature_set"])["delta_abs_err"].median().reset_index().pivot(index="phenotype_col", columns="feature_set", values='delta_abs_err').reset_index()
 plot = (
     pn.ggplot(errors_df,
-    pn.aes(x="LOFTEE_pLoF", y="AbExp_all_tissues", fill="phenotype_col"))
+    pn.aes(x="LOFTEE", y="AbExp_all_tissues", fill="phenotype_col"))
     + pn.geom_point(size=3)
         + pn.geom_abline(slope=1, color="black", linetype="dashed")
         + pn.ggtitle(f"Median of change in absolute error where prediction differs by \nmore than {distance_std} standard deviation(s) from common PRS")
@@ -1116,7 +1116,7 @@ pn.ggsave(plot, path + ".pdf", dpi=DPI, limitsize=False)
 errors_df.to_parquet(path + ".parquet", index=False)
 
 # %%
-plot_df = pandas_df.query("updated == True and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])")
+plot_df = pandas_df.query("updated == True and feature_set.isin(['AbExp_all_tissues', 'LOFTEE'])")
 plot = (
     pn.ggplot(
         plot_df, 
@@ -1148,7 +1148,7 @@ plot_df = (
             .cumsum()
         )
     })
-    .query("full_model_improvement_rank<1000 and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])")
+    .query("full_model_improvement_rank<1000 and feature_set.isin(['AbExp_all_tissues', 'LOFTEE'])")
 )
 plot = (
     pn.ggplot(plot_df, pn.aes(x='full_model_improvement_rank', y='samples_in_extreme_percentiles', color='feature_set'))
@@ -1196,7 +1196,7 @@ improvements_df = pd.concat(res)
 
 # %%
 plot_df = (
-    improvements_df.query("full_model_improvement != 'none' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE_pLoF'])")
+    improvements_df.query("full_model_improvement != 'none' and feature_set.isin(['AbExp_all_tissues', 'LOFTEE'])")
     .pivot(index=["phenotype_col", "feature_set", "sd_cutoff"], columns="full_model_improvement", values='individuals')
     .reset_index()
     .fillna(0)
@@ -1224,7 +1224,7 @@ plot = (
     )
     + pn.facet_wrap("sd_cutoff_label", scales="free_x")
     + pn.scale_x_discrete(limits=plot_df.query("feature_set=='AbExp_all_tissues' and sd_cutoff==1").sort_values("reduce")["phenotype_col"].to_list())
-    # + pn.scale_fill_manual(["red", "blue"],breaks=reversed(["LOFTEE_pLoF", "AbExp_all_tissues"]))
+    # + pn.scale_fill_manual(["red", "blue"],breaks=reversed(["LOFTEE", "AbExp_all_tissues"]))
     + pn.coord_flip()
     + pn.labs(y='Nr. of individuals with:\n◀---- increased prediction error ---- ┃ ---- reduced prediction error ----▶', x="phenotype")
 )
