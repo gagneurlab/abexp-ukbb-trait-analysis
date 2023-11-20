@@ -36,7 +36,7 @@ include: 'scripts/__init__.smk'
 hdl_cholesterol=expand(
     rules.associate__compare_genebass.output,
     phenotype_col="HDL_cholesterol", 
-    feature_set=["LOFTEE_pLoF", "AbExp_all_tissues", "max_AbExp", "median_AbExp"],
+    feature_set=["LOFTEE", "AbExp_all_tissues", "minimum_AbExp", "median_AbExp"],
     covariates=["sex_age_genPC", "sex_age_genPC_CLMP", "sex_age_genPC_CLMP_PRS"],
 )
 
@@ -108,16 +108,16 @@ rule all:
             ],
             model_type=[
                 "lightgbm",
-                "linear",
+                "normalized_linear",
             ]
         ),
         expand(
             rules.associate__qq_plot.output,
             phenotype_col=all_traits,
             feature_set=[
-                "LOFTEE_pLoF",
+                "LOFTEE",
                 "AbExp_all_tissues",
-                "max_AbExp",
+                "minimum_AbExp",
                 "median_AbExp"
             ],
             covariates=["randomized_sex_age_genPC_CLMP_PRS", ],
@@ -131,9 +131,9 @@ rule all:
         # expand(
         #     rules.associate__polygenic_risk_score.output, 
         #     feature_set=[
-        #         "LOFTEE_pLoF",
+        #         "LOFTEE",
         #         "AbExp_all_tissues",
-        #         "max_AbExp",
+        #         "minimum_AbExp",
         #         "median_AbExp"
         #     ],
         #     phenotype_col=all_traits,
