@@ -99,7 +99,7 @@ plot_df = as.data.table(read_parquet(paste0(snakemake@params$compare_association
 plot_df
 
 # %%
-plot_df$ratio = plot_df$AbExp_all_tissues / plot_df$LOFTEE_pLoF
+plot_df$ratio = plot_df$AbExp_all_tissues / plot_df$LOFTEE
 plot_df$significant = (plot_df$ratio >= 2) | (plot_df$ratio <= 0.5)
 # plot_df$phenotype = ifelse(plot_df$significant, plot_df$phenotype_col, "")
 plot_df
@@ -108,19 +108,19 @@ plot_df
 plot_df[order(`ratio`, decreasing = TRUE)]
 
 # %%
-plot_df[`LOFTEE_pLoF` > `AbExp_all_tissues`]
+plot_df[`LOFTEE` > `AbExp_all_tissues`]
 
 # %%
-plot_df[`LOFTEE_pLoF` < `AbExp_all_tissues`]
+plot_df[`LOFTEE` < `AbExp_all_tissues`]
 
 # %%
-sum(plot_df[,`LOFTEE_pLoF`])
+sum(plot_df[,`LOFTEE`])
 
 # %%
 sum(plot_df[,`AbExp_all_tissues`])
 
 # %%
-sum(plot_df[,`AbExp_all_tissues`]) / sum(plot_df[,`LOFTEE_pLoF`])
+sum(plot_df[,`AbExp_all_tissues`]) / sum(plot_df[,`LOFTEE`])
 
 # %%
 plot_df$phenotype_col
@@ -150,12 +150,12 @@ traits_to_show = c(
 print(traits_to_show)
 
 # %%
-max_n = max(plot_df$`LOFTEE_pLoF`, plot_df$`AbExp_all_tissues`)
+max_n = max(plot_df$`LOFTEE`, plot_df$`AbExp_all_tissues`)
 max_n
 
 # %%
 plot_1 = (
-    ggplot(plot_df, aes(x=`LOFTEE_pLoF`, y=`AbExp_all_tissues`))
+    ggplot(plot_df, aes(x=`LOFTEE`, y=`AbExp_all_tissues`))
     + geom_point(size=2)
     + geom_abline(slope=1, color="black", linetype="dashed")
     + labs(
@@ -340,8 +340,8 @@ display_png(file=paste0(path, ".png"))
 # ## r² bar plot proportional difference
 
 # %%
-phenotype_label_order = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_dir, "/r2_bar_plot_proportional_difference.LOFTEE_pLoF__vs__AbExp_all_tissues.parquet")))
-phenotype_label_order = phenotype_label_order[,.(`phenotype_label_order`=mean(`difference_to_LOFTEE_pLoF`)), by=`phenotype_col`]
+phenotype_label_order = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_dir, "/r2_bar_plot_proportional_difference.LOFTEE__vs__AbExp_all_tissues.parquet")))
+phenotype_label_order = phenotype_label_order[,.(`phenotype_label_order`=mean(`difference_to_LOFTEE`)), by=`phenotype_col`]
 phenotype_label_order = phenotype_label_order[order(`phenotype_label_order`, decreasing = TRUE)]$phenotype_col
 phenotype_label_order
 
@@ -349,14 +349,14 @@ phenotype_label_order
 snakemake@params$compare_risk_scores_dir
 
 # %%
-plot_df = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_dir, "/r2_bar_plot_proportional_difference.LOFTEE_pLoF__vs__AbExp_all_tissues.parquet")))
+plot_df = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_dir, "/r2_bar_plot_proportional_difference.LOFTEE__vs__AbExp_all_tissues.parquet")))
 plot_df
 
 # %%
 plot_4 = (
     ggplot(plot_df, aes(
-        x=reorder(`phenotype_col`, `proportional_difference_to_LOFTEE_pLoF`),
-        y=`proportional_difference_to_LOFTEE_pLoF`,
+        x=reorder(`phenotype_col`, `proportional_difference_to_LOFTEE`),
+        y=`proportional_difference_to_LOFTEE`,
         color=`significant`,
     ))
     # + geom_boxplot()
@@ -445,13 +445,13 @@ plot_5 = (
     + scale_fill_manual(
         labels=c(
             `AbExp_all_tissues` = "AbExp",
-            `LOFTEE_pLoF` = "LOFTEE"
+            `LOFTEE` = "LOFTEE"
         ),
         # values=c("orange", "#619CFF"),
         values=c(
             `AbExp_all_tissues` = "#48a462",
-            `LOFTEE_pLoF` = "#999999"
-            # `LOFTEE_pLoF` = "#619CFF"
+            `LOFTEE` = "#999999"
+            # `LOFTEE` = "#619CFF"
         ),
     )
     + theme(
@@ -459,7 +459,7 @@ plot_5 = (
     )
     #+ facet_wrap("sd_cutoff_label", scales="free_x")
     # + scale_x_discrete(limits=plot_df.query("feature_set=='AbExp_all_tissues' and sd_cutoff==1").sort_values("reduce")["phenotype_col"].to_list())
-    # + scale_fill_manual(["red", "blue"],breaks=reversed(["LOFTEE_pLoF", "AbExp_all_tissues"]))
+    # + scale_fill_manual(["red", "blue"],breaks=reversed(["LOFTEE", "AbExp_all_tissues"]))
     + coord_flip()
     + labs(
         y='Nr. of individuals with:\n◀---- increased prediction error ---- ┃ ---- reduced prediction error ----▶',
@@ -542,7 +542,7 @@ lower_lhs = ggarrange(
         #     name="",
         #     labels=c(
         #         `AbExp_all_tissues` = "AbExp-DNA",
-        #         `LOFTEE_pLoF` = "LOFTEE pLoF"
+        #         `LOFTEE` = "LOFTEE pLoF"
         #     )
         # )
         + ggtitle(NULL)
@@ -558,7 +558,7 @@ lower_lhs = ggarrange(
         )
         # + scale_fill_manual(values=c("orange", "#619CFF"),labels=c(
         #         `AbExp_all_tissues` = "AbExp",
-        #         `LOFTEE_pLoF` = "LOFTEE pLoF"
+        #         `LOFTEE` = "LOFTEE pLoF"
         # ))
         + labs(tag = "e")
     ),
@@ -736,9 +736,9 @@ display_png(file=paste0(path, ".png"))
 
 # %%
 rename_models = c(
-    `LOFTEE_pLoF` = "LOFTEE",
+    `LOFTEE` = "LOFTEE",
     `AbExp_all_tissues` = "AbExp all tissues",
-    `max_AbExp` = "Minimum AbExp",
+    `minimum_AbExp` = "Minimum AbExp",
     `median_AbExp` = "Median AbExp"
 )
 
@@ -747,7 +747,10 @@ plot_df = as.data.table(read_parquet(paste0(snakemake@params$compare_association
 plot_df
 
 # %%
-plot_df$ratio = plot_df$AbExp_all_tissues / plot_df$LOFTEE_pLoF
+plot_df[, .(sum(`AbExp_all_tissues`), sum(`LOFTEE`), sum(`median_AbExp`), sum(`minimum_AbExp`)), by="covariates"]
+
+# %%
+plot_df$ratio = plot_df$AbExp_all_tissues / plot_df$LOFTEE
 plot_df$significant = (plot_df$ratio >= 2) | (plot_df$ratio <= 0.5)
 # plot_df$phenotype = ifelse(plot_df$significant, plot_df$phenotype_col, "")
 plot_df
@@ -777,14 +780,14 @@ traits_to_show = c(
 print(traits_to_show)
 
 # %%
-max_n = max(plot_df$`max_AbExp`, plot_df$`median_AbExp`, plot_df$`AbExp_all_tissues`)
+max_n = max(plot_df$`minimum_AbExp`, plot_df$`median_AbExp`, plot_df$`AbExp_all_tissues`)
 max_n
 
 # %%
 melted_plot_df = melt(
     plot_df,
     id.vars=c("phenotype_col", "covariates"),
-    measure.vars=c("max_AbExp", "median_AbExp")
+    measure.vars=c("minimum_AbExp", "median_AbExp")
 )
 melted_plot_df = merge(
     melted_plot_df,
@@ -792,7 +795,7 @@ melted_plot_df = merge(
     on=c("phenotype_col", "covariates"),
     how="outer"
 )
-melted_plot_df[, variable:=recode(melted_plot_df$variable, `max_AbExp` = "Minimum", `median_AbExp` = "Median")]
+melted_plot_df[, variable:=recode(melted_plot_df$variable, `minimum_AbExp` = "Minimum", `median_AbExp` = "Median")]
 melted_plot_df
 
 # %%
@@ -894,20 +897,20 @@ ggsave(paste0(path, ".svg"), qq_plot, width = w, height = h, dpi=600, device=svg
 # ## r² bar plot proportional difference
 
 # %%
-linear_phenotype_label_order = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_linear_dir, "/r2_bar_plot_proportional_difference.LOFTEE_pLoF__vs__AbExp_all_tissues.parquet")))
-linear_phenotype_label_order = linear_phenotype_label_order[,.(`phenotype_label_order`=mean(`difference_to_LOFTEE_pLoF`)), by=`phenotype_col`]
+linear_phenotype_label_order = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_linear_dir, "/r2_bar_plot_proportional_difference.LOFTEE__vs__AbExp_all_tissues.parquet")))
+linear_phenotype_label_order = linear_phenotype_label_order[,.(`phenotype_label_order`=mean(`difference_to_LOFTEE`)), by=`phenotype_col`]
 linear_phenotype_label_order = linear_phenotype_label_order[order(`phenotype_label_order`, decreasing = TRUE)]$phenotype_col
 linear_phenotype_label_order
 
 # %%
-linear_pheno_df = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_linear_dir, "/r2_bar_plot_proportional_difference.LOFTEE_pLoF__vs__AbExp_all_tissues.parquet")))
+linear_pheno_df = as.data.table(read_parquet(paste0(snakemake@params$compare_risk_scores_linear_dir, "/r2_bar_plot_proportional_difference.LOFTEE__vs__AbExp_all_tissues.parquet")))
 linear_pheno_df
 
 # %%
 linear_plot_4 = (
     ggplot(linear_pheno_df, aes(
-        x=reorder(`phenotype_col`, `proportional_difference_to_LOFTEE_pLoF`),
-        y=`proportional_difference_to_LOFTEE_pLoF`,
+        x=reorder(`phenotype_col`, `proportional_difference_to_LOFTEE`),
+        y=`proportional_difference_to_LOFTEE`,
         color=`significant`,
     ))
     # + geom_boxplot()
@@ -996,13 +999,13 @@ linear_plot_5 = (
     + scale_fill_manual(
         labels=c(
             `AbExp_all_tissues` = "AbExp",
-            `LOFTEE_pLoF` = "LOFTEE"
+            `LOFTEE` = "LOFTEE"
         ),
         # values=c("orange", "#619CFF"),
         values=c(
             `AbExp_all_tissues` = "#48a462",
-            `LOFTEE_pLoF` = "#999999"
-            # `LOFTEE_pLoF` = "#619CFF"
+            `LOFTEE` = "#999999"
+            # `LOFTEE` = "#619CFF"
         ),
     )
     + theme(
@@ -1010,7 +1013,7 @@ linear_plot_5 = (
     )
     #+ facet_wrap("sd_cutoff_label", scales="free_x")
     # + scale_x_discrete(limits=plot_df.query("feature_set=='AbExp_all_tissues' and sd_cutoff==1").sort_values("reduce")["phenotype_col"].to_list())
-    # + scale_fill_manual(["red", "blue"],breaks=reversed(["LOFTEE_pLoF", "AbExp_all_tissues"]))
+    # + scale_fill_manual(["red", "blue"],breaks=reversed(["LOFTEE", "AbExp_all_tissues"]))
     + coord_flip()
     + labs(
         y='Nr. of individuals with:\n◀---- increased prediction error ---- ┃ ---- reduced prediction error ----▶',
@@ -1054,7 +1057,7 @@ nonlinear_rsquared_df
 
 # %%
 rsquared_df = merge(linear_rsquared_df, nonlinear_rsquared_df, by=c("phenotype_col", "feature_set", "covariates", "predictor_variables"), how="inner")
-rsquared_df[, `feature_set` := recode(`feature_set`, `AbExp_all_tissues` = "AbExp all tissues", `LOFTEE_pLoF` = "LOFTEE")]
+rsquared_df[, `feature_set` := recode(`feature_set`, `AbExp_all_tissues` = "AbExp all tissues", `LOFTEE` = "LOFTEE")]
 rsquared_df$phenotype_col = str_replace_all(rsquared_df$phenotype_col, "_", " ")
 rsquared_df
 
@@ -1197,7 +1200,7 @@ supplementary_s4_plot = ggarrange(
             #     name="",
             #     labels=c(
             #         `AbExp_all_tissues` = "AbExp-DNA",
-            #         `LOFTEE_pLoF` = "LOFTEE pLoF"
+            #         `LOFTEE` = "LOFTEE pLoF"
             #     )
             # )
             + ggtitle(NULL)
@@ -1213,7 +1216,7 @@ supplementary_s4_plot = ggarrange(
             )
             # + scale_fill_manual(values=c("orange", "#619CFF"),labels=c(
             #         `AbExp_all_tissues` = "AbExp",
-            #         `LOFTEE_pLoF` = "LOFTEE pLoF"
+            #         `LOFTEE` = "LOFTEE pLoF"
             # ))
             + labs(tag = "b")
         ),
@@ -1255,7 +1258,7 @@ supplementary_s4_plot = ggarrange(
             #     name="",
             #     labels=c(
             #         `AbExp_all_tissues` = "AbExp-DNA",
-            #         `LOFTEE_pLoF` = "LOFTEE pLoF"
+            #         `LOFTEE` = "LOFTEE pLoF"
             #     )
             # )
             + ggtitle(NULL)
@@ -1271,7 +1274,7 @@ supplementary_s4_plot = ggarrange(
             )
             # + scale_fill_manual(values=c("orange", "#619CFF"),labels=c(
             #         `AbExp_all_tissues` = "AbExp",
-            #         `LOFTEE_pLoF` = "LOFTEE pLoF"
+            #         `LOFTEE` = "LOFTEE pLoF"
             # ))
             + labs(tag = "b")
         )
@@ -1293,5 +1296,7 @@ ggsave(paste0(path, ".svg"), supplementary_s4_plot, width = 10, height = 12, dpi
 ggsave(paste0(path, ".pdf"), supplementary_s4_plot, width = 10, height = 12, dpi=600, device=cairo_pdf)
 
 # display_pdf(file=paste0(path, ".pdf"))
+
+# %%
 
 # %%
